@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-surface: var(--srf);
+  --color-surface-hover: var(--srf-h);
+  --color-border: var(--brd);
+  --color-primary: #2563EB;
+  --color-primary-light: #3B82F6;
+  --color-accent: #06B6D4;
+  --color-foreground: var(--fg);
+  --color-muted: var(--mt);
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --font-sans: 'Poppins', sans-serif;
+}
+
+/* Dark mode (default) */
+:root {
+  --bg: #0A0E1A;
+  --srf: #111827;
+  --srf-h: #1a2234;
+  --brd: #1F2937;
+  --fg: #F9FAFB;
+  --mt: #9CA3AF;
+}
+
+/* Light mode */
+html.light {
+  --bg: #F3F4F6;
+  --srf: #FFFFFF;
+  --srf-h: #F9FAFB;
+  --brd: #E5E7EB;
+  --fg: #111827;
+  --mt: #6B7280;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--brd); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mt); }
+
+/* Logos: en dark mode se invierten (tienen texto oscuro original) */
+html:not(.light) .logo-auto {
+  filter: brightness(0) invert(1);
+}
