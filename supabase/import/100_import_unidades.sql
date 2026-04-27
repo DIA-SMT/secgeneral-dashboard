@@ -2,10 +2,15 @@
 -- 100: Importacion de unidades organizacionales reales
 -- ============================================================
 -- Arbol jerarquico extraido del PDF del POA 2026.
--- 15 unidades: 1 secretaria + 2 subsecretarias + 12 direcciones
+-- 19 unidades: 1 secretaria + 3 subsecretarias + 15 direcciones
 --
 -- Nota D-06: El responsable de la Subsecretaria de Desarrollo
 -- Humano no figura en el PDF. Se deja null.
+--
+-- Nota D-07: La Subsecretaria de Cultura (incorporada bajo la
+-- Secretaria General) tiene 3 direcciones: Gestion Cultural,
+-- Museos y Turismo y Cultura. Responsable no identificado en el
+-- PDF de Cultura, se deja null.
 -- ============================================================
 
 BEGIN;
@@ -15,6 +20,7 @@ DECLARE
   v_sg   uuid;
   v_sdh  uuid;
   v_sge  uuid;
+  v_scu  uuid;
 BEGIN
 
   -- =========================
@@ -37,6 +43,11 @@ BEGIN
   VALUES (v_sg, 'Subsecretaría de Gestión Estratégica y Documentación', 'Gestión Estratégica', 'subsecretaria', 1, 2, 'Mg. Humberto Ponce de León')
   RETURNING id INTO v_sge;
 
+  -- D-07: Subsecretaria de Cultura (responsable no identificado en el PDF)
+  INSERT INTO unidad_organizacional (parent_id, nombre, nombre_corto, tipo, nivel, orden, responsable_nombre)
+  VALUES (v_sg, 'Subsecretaría de Cultura', 'Cultura', 'subsecretaria', 1, 3, NULL)
+  RETURNING id INTO v_scu;
+
   -- =========================
   -- NIVEL 2: Direcciones bajo Desarrollo Humano
   -- =========================
@@ -58,6 +69,14 @@ BEGIN
     (v_sge, 'Dirección de Documentación Estratégica', 'Doc. Estratégica', 'direccion', 2, 1),
     (v_sge, 'Dirección de Planificación Estratégica', 'Planificación', 'direccion', 2, 2),
     (v_sge, 'Dirección de Gerencia de Datos', 'Gerencia de Datos', 'direccion', 2, 3);
+
+  -- =========================
+  -- NIVEL 2: Direcciones bajo Cultura
+  -- =========================
+  INSERT INTO unidad_organizacional (parent_id, nombre, nombre_corto, tipo, nivel, orden) VALUES
+    (v_scu, 'Dirección de Gestión Cultural', 'Gestión Cultural', 'direccion', 2, 1),
+    (v_scu, 'Dirección de Museos', 'Museos', 'direccion', 2, 2),
+    (v_scu, 'Dirección de Turismo y Cultura', 'Turismo y Cultura', 'direccion', 2, 3);
 
 END;
 $$;

@@ -23,6 +23,9 @@ Emojis por area (usá siempre el que corresponda al mencionar un area):
   📈 Gerencia de Datos
   🗣️ Tartamudez
   🧠 CIM CEA
+  🎭 Cultura / Gestión Cultural
+  🏛️ Museos
+  🗺️ Turismo y Cultura
 
 Emojis por tipo de estado o contenido:
   ⚠️ alerta o vencimiento

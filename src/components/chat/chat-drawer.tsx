@@ -17,7 +17,7 @@ const EXECUTIVE_SUGGESTIONS = [
   "📊 ¿Cómo está el estado general del POA?",
   "⚠️ ¿Qué hitos están vencidos?",
   "⏳ ¿Qué áreas no tienen primer reporte?",
-  "🏥 ¿Cómo está Desarrollo Humano?",
+  "🎭 ¿Cómo está Cultura?",
 ];
 
 const OPERATIVE_SUGGESTIONS = [
