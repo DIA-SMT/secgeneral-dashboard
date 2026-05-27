@@ -16,11 +16,11 @@ export function SemaforoSummary({
   const total = verde + amarillo + rojo + sin_datos;
   return (
     <div className="flex items-center gap-4">
-      <SemaforoItem color="bg-success" count={verde} label="Al día" />
-      <SemaforoItem color="bg-warning" count={amarillo} label="En atención" />
-      <SemaforoItem color="bg-danger" count={rojo} label="Atrasado" />
+      <SemaforoItem color="bg-success" count={verde} label="FINALIZADO" />
+      <SemaforoItem color="bg-warning" count={amarillo} label="EN EJECUCIÓN" />
+      <SemaforoItem color="bg-danger" count={rojo} label="NO INICIADO" />
       {sin_datos > 0 && (
-        <SemaforoItem color="bg-primary/30" count={sin_datos} label="Pendientes" />
+        <SemaforoItem color="bg-primary/30" count={sin_datos} label="Sin datos" />
       )}
       <span className="text-xs text-muted ml-2">
         {total} {label}

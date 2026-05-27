@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Credenciales temporales generadas por scripts de seed (no commitear)
+supabase/import/usuarios-credenciales.csv

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { chatTools } from "@/lib/chat/tool-definitions";
 import { buildSystemPrompt, type ChatContext } from "@/lib/chat/system-prompt";
 import * as tools from "@/lib/chat/tools";
+import { getPerfilActual } from "@/lib/auth";
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY!;
 const MODEL = "anthropic/claude-sonnet-4.6";
@@ -33,6 +34,23 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
       return tools.confirmarCompletarHito(input as Parameters<typeof tools.confirmarCompletarHito>[0]);
     case "cancelar_propuesta":
       return tools.cancelarPropuesta(input as Parameters<typeof tools.cancelarPropuesta>[0]);
+    // --- Tools V2 ---
+    case "obtener_indicadores_de_meta":
+      return tools.obtenerIndicadoresDeMeta(input as Parameters<typeof tools.obtenerIndicadoresDeMeta>[0]);
+    case "actualizar_indicador":
+      return tools.actualizarIndicador(input as Parameters<typeof tools.actualizarIndicador>[0]);
+    case "listar_avances_pendientes_validacion":
+      return tools.listarAvancesPendientesValidacion(input as Parameters<typeof tools.listarAvancesPendientesValidacion>[0]);
+    case "validar_avance_chat":
+      return tools.validarAvanceChat(input as Parameters<typeof tools.validarAvanceChat>[0]);
+    case "observar_avance_chat":
+      return tools.observarAvanceChat(input as Parameters<typeof tools.observarAvanceChat>[0]);
+    case "obtener_agenda_semana":
+      return tools.obtenerAgendaSemana(input as Parameters<typeof tools.obtenerAgendaSemana>[0]);
+    case "proponer_actividad_agenda":
+      return tools.proponerActividadAgenda(input as Parameters<typeof tools.proponerActividadAgenda>[0]);
+    case "confirmar_actividad_agenda":
+      return tools.confirmarActividadAgenda(input as Parameters<typeof tools.confirmarActividadAgenda>[0]);
     default:
       return { error: `Tool desconocida: ${name}` };
   }
@@ -88,7 +106,19 @@ export async function POST(req: NextRequest) {
       context: ChatContext;
     };
 
-    const systemPrompt = buildSystemPrompt(context);
+    // Enriquecer contexto con perfil del usuario autenticado (server-side)
+    // El cliente no puede falsificar su rol.
+    const perfil = await getPerfilActual();
+    const contextEnriquecido: ChatContext = {
+      ...context,
+      rol: perfil?.rol,
+      perfil_nombre: perfil?.nombre ?? perfil?.email,
+      perfil_unidad_id: perfil?.unidad_id ?? undefined,
+      perfil_unidad_nombre:
+        perfil?.unidad?.nombre_corto ?? perfil?.unidad?.nombre ?? undefined,
+    };
+
+    const systemPrompt = buildSystemPrompt(contextEnriquecido);
 
     // Build OpenRouter messages
     const orMessages: OpenRouterMessage[] = [

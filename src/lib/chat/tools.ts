@@ -615,3 +615,295 @@ async function getPeriodoActivoId(): Promise<string> {
     .single();
   return (data as any).id;
 }
+
+// =============================================================
+// Tools NUEVAS: Indicadores
+// =============================================================
+
+export async function obtenerIndicadoresDeMeta(params: { meta_id: string }) {
+  const { data: meta } = await supabase
+    .from("meta")
+    .select("id, nombre")
+    .eq("id", params.meta_id)
+    .single();
+  if (!meta) return { error: "Meta no encontrada" };
+
+  const { data: indicadores } = await supabase
+    .from("indicador")
+    .select("id, codigo, nombre, valor_actual, valor_objetivo, unidad_medida, estado_semaforo, ultima_actualizacion")
+    .eq("meta_id", params.meta_id)
+    .is("deleted_at", null)
+    .order("orden")
+    .limit(50);
+
+  return {
+    meta: (meta as any).nombre,
+    indicadores: (indicadores ?? []).map((i: any) => ({
+      id: i.id,
+      codigo: i.codigo,
+      nombre: i.nombre,
+      valor_actual: i.valor_actual,
+      valor_objetivo: i.valor_objetivo,
+      unidad_medida: i.unidad_medida,
+      semaforo: i.estado_semaforo,
+      ultima_actualizacion: i.ultima_actualizacion,
+    })),
+  };
+}
+
+export async function actualizarIndicador(params: {
+  indicador_id: string;
+  valor_actual: number;
+}) {
+  const { data: ind } = await supabase
+    .from("indicador")
+    .select("id, nombre, valor_objetivo, metadata")
+    .eq("id", params.indicador_id)
+    .single();
+  if (!ind) return { error: "Indicador no encontrado" };
+
+  const invertida = ((ind as any).metadata as Record<string, unknown> | undefined)?.invertida === true;
+  const objetivo = (ind as any).valor_objetivo as number | null;
+  let estado = "sin_datos";
+  if (objetivo != null) {
+    let pct: number;
+    if (invertida && objetivo !== 0) {
+      pct = ((0 - params.valor_actual) / (0 - objetivo)) * 100;
+    } else if (objetivo !== 0) {
+      pct = (params.valor_actual / objetivo) * 100;
+    } else {
+      pct = params.valor_actual >= objetivo ? 100 : 0;
+    }
+    pct = Math.max(0, Math.min(100, pct));
+    estado = pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : "rojo";
+  }
+
+  const { error } = await supabase
+    .from("indicador")
+    .update({
+      valor_actual: params.valor_actual,
+      estado_semaforo: estado,
+      ultima_actualizacion: new Date().toISOString(),
+    })
+    .eq("id", params.indicador_id);
+
+  if (error) return { error: error.message };
+
+  return {
+    success: true,
+    indicador: (ind as any).nombre,
+    valor_actual: params.valor_actual,
+    valor_objetivo: objetivo,
+    semaforo: estado,
+    mensaje: "Indicador actualizado.",
+  };
+}
+
+// =============================================================
+// Tools NUEVAS: Validación de avances
+// =============================================================
+
+export async function listarAvancesPendientesValidacion(params: {
+  unidad_id?: string;
+}) {
+  let pyQuery = supabase
+    .from("proyecto")
+    .select("id, nombre, codigo, unidad_id")
+    .is("deleted_at", null);
+
+  if (params.unidad_id) {
+    const { data: hijos } = await supabase
+      .from("unidad_organizacional")
+      .select("id")
+      .eq("parent_id", params.unidad_id);
+    const ids = [params.unidad_id, ...(hijos ?? []).map((h) => h.id)];
+    pyQuery = pyQuery.in("unidad_id", ids);
+  }
+
+  const { data: proyectos } = await pyQuery;
+  const pyIds = (proyectos ?? []).map((p) => (p as any).id);
+  if (pyIds.length === 0) return [];
+  const pyMap = new Map((proyectos ?? []).map((p) => [(p as any).id, p]));
+
+  const { data: avances } = await supabase
+    .from("avance")
+    .select("id, fecha_reporte, valor_numerico, valor_cualitativo, observacion, proyecto_id, meta:meta(id, nombre)")
+    .eq("estado_validacion", "pendiente")
+    .in("proyecto_id", pyIds)
+    .order("fecha_reporte", { ascending: false })
+    .limit(20);
+
+  return (avances ?? []).map((a: any) => {
+    const py = pyMap.get(a.proyecto_id) as any;
+    return {
+      avance_id: a.id,
+      fecha: a.fecha_reporte,
+      proyecto: py?.nombre,
+      proyecto_codigo: py?.codigo,
+      meta: a.meta?.nombre ?? null,
+      valor: a.valor_numerico ?? a.valor_cualitativo ?? null,
+      observacion: a.observacion,
+    };
+  });
+}
+
+export async function validarAvanceChat(params: { avance_id: string }) {
+  const { error } = await supabase
+    .from("avance")
+    .update({
+      estado_validacion: "validado",
+      validado_at: new Date().toISOString(),
+      observacion_validacion: null,
+    })
+    .eq("id", params.avance_id);
+  if (error) return { error: error.message };
+  return { success: true, mensaje: "Avance validado." };
+}
+
+export async function observarAvanceChat(params: {
+  avance_id: string;
+  motivo: string;
+}) {
+  if (!params.motivo?.trim()) return { error: "El motivo es obligatorio" };
+  const { error } = await supabase
+    .from("avance")
+    .update({
+      estado_validacion: "observado",
+      validado_at: new Date().toISOString(),
+      observacion_validacion: params.motivo.trim(),
+    })
+    .eq("id", params.avance_id);
+  if (error) return { error: error.message };
+  return { success: true, mensaje: "Avance devuelto con observación." };
+}
+
+// =============================================================
+// Tools NUEVAS: Agenda semanal
+// =============================================================
+
+function lunesDeSemana(fecha: Date = new Date()): string {
+  const d = new Date(fecha);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function obtenerAgendaSemana(params: {
+  unidad_id: string;
+  fecha_lunes?: string;
+}) {
+  const fechaLunes = params.fecha_lunes ?? lunesDeSemana();
+
+  const { data: sem } = await supabase
+    .from("agenda_semana")
+    .select("id, formato_libre, actividades:agenda_actividad(id, dia_semana, orden, es_feriado, actividad, lugar, horario)")
+    .eq("unidad_id", params.unidad_id)
+    .eq("fecha_lunes", fechaLunes)
+    .maybeSingle();
+
+  if (!sem) return { mensaje: "Sin agenda cargada para esa semana", fecha_lunes: fechaLunes };
+
+  return {
+    fecha_lunes: fechaLunes,
+    formato_libre: (sem as any).formato_libre,
+    actividades: ((sem as any).actividades ?? []).map((a: any) => ({
+      dia_semana: a.dia_semana,
+      actividad: a.actividad,
+      lugar: a.lugar,
+      horario: a.horario,
+      es_feriado: a.es_feriado,
+    })),
+  };
+}
+
+export async function proponerActividadAgenda(params: {
+  unidad_id: string;
+  dia_semana: number; // 1=Lunes ... 7=Domingo
+  actividad: string;
+  lugar?: string;
+  horario?: string;
+  fecha_lunes?: string;
+}) {
+  const fechaLunes = params.fecha_lunes ?? lunesDeSemana();
+  const { data: propuesta, error } = await supabase
+    .from("propuesta_carga")
+    .insert({
+      tipo: "agenda_actividad",
+      observacion: `Día ${params.dia_semana} | ${params.actividad}${params.lugar ? ` | ${params.lugar}` : ""}${params.horario ? ` | ${params.horario}` : ""}`,
+      texto_usuario: `Agregar a la agenda: ${params.actividad}`,
+      estado: "pendiente",
+      payload_original: {
+        unidad_id: params.unidad_id,
+        dia_semana: params.dia_semana,
+        actividad: params.actividad,
+        lugar: params.lugar ?? null,
+        horario: params.horario ?? null,
+        fecha_lunes: fechaLunes,
+      },
+    })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+
+  return {
+    propuesta_id: (propuesta as any).id,
+    tipo: "agenda_actividad",
+    dia_semana: params.dia_semana,
+    actividad: params.actividad,
+    lugar: params.lugar,
+    horario: params.horario,
+    fecha_lunes: fechaLunes,
+    mensaje: "Propuesta de agenda armada. Esperando confirmación del usuario.",
+  };
+}
+
+export async function confirmarActividadAgenda(params: { propuesta_id: string }) {
+  const { data: prop } = await supabase
+    .from("propuesta_carga")
+    .select("*")
+    .eq("id", params.propuesta_id)
+    .eq("estado", "pendiente")
+    .single();
+  if (!prop) return { error: "Propuesta no encontrada o ya procesada" };
+
+  const payload = (prop as any).payload_original as {
+    unidad_id: string;
+    dia_semana: number;
+    actividad: string;
+    lugar: string | null;
+    horario: string | null;
+    fecha_lunes: string;
+  };
+
+  // Upsert agenda_semana
+  const { data: sem, error: semErr } = await supabase
+    .from("agenda_semana")
+    .upsert(
+      { unidad_id: payload.unidad_id, fecha_lunes: payload.fecha_lunes },
+      { onConflict: "unidad_id,fecha_lunes" }
+    )
+    .select("id")
+    .single();
+  if (semErr || !sem) return { error: semErr?.message ?? "No se pudo crear semana" };
+
+  // Insertar actividad
+  const { error: actErr } = await supabase.from("agenda_actividad").insert({
+    agenda_semana_id: (sem as any).id,
+    dia_semana: payload.dia_semana,
+    orden: 99,
+    es_feriado: false,
+    actividad: payload.actividad,
+    lugar: payload.lugar,
+    horario: payload.horario,
+  });
+  if (actErr) return { error: actErr.message };
+
+  await supabase
+    .from("propuesta_carga")
+    .update({ estado: "confirmada", confirmada_at: new Date().toISOString() })
+    .eq("id", (prop as any).id);
+
+  return { success: true, mensaje: "Actividad agregada a la agenda." };
+}

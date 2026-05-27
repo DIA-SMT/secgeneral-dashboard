@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import type { Meta } from "@/types/database";
+import type { Meta, Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { calcularPorcentajeMeta, semaforoTextColor, formatFecha, formatFechaRelativa } from "@/lib/utils";
 import { AvanceForm } from "./avance-form";
+import { IndicadoresPanel } from "@/components/indicadores/indicador-mini-form";
 
 interface MetaCardWithFormProps {
   meta: Meta;
   proyectoId: string;
+  indicadores?: Indicador[];
+  puedeCargar?: boolean;
 }
 
-export function MetaCardWithForm({ meta, proyectoId }: MetaCardWithFormProps) {
+export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCargar = false }: MetaCardWithFormProps) {
   const [showForm, setShowForm] = useState(false);
   const pct = calcularPorcentajeMeta(meta);
   const invertida = (meta.metadata as Record<string, unknown>)?.invertida === true;
@@ -84,8 +87,8 @@ export function MetaCardWithForm({ meta, proyectoId }: MetaCardWithFormProps) {
               <span className="text-xs text-muted/50">—</span>
             )}
           </div>
-          {/* Boton cargar avance */}
-          {meta.tipo_medicion !== "hito_unico" || meta.valor_actual !== 1 ? (
+          {/* Boton cargar avance — solo Director o admin */}
+          {puedeCargar && (meta.tipo_medicion !== "hito_unico" || meta.valor_actual !== 1) ? (
             <button
               onClick={() => setShowForm(!showForm)}
               className="text-[10px] font-medium text-primary hover:text-primary-light transition-colors"
@@ -107,8 +110,9 @@ export function MetaCardWithForm({ meta, proyectoId }: MetaCardWithFormProps) {
 
       {/* Formulario inline */}
       {showForm && (
-        <div className="mt-3">
+        <div className="mt-3 space-y-3 border-t border-border pt-3">
           <AvanceForm meta={meta} proyectoId={proyectoId} onClose={() => setShowForm(false)} />
+          <IndicadoresPanel metaId={meta.id} proyectoId={proyectoId} indicadores={indicadores} />
         </div>
       )}
     </div>

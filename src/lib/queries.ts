@@ -1,5 +1,42 @@
 import { supabase } from "./supabase";
-import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, EstadoSemaforo } from "@/types/database";
+import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, EstadoSemaforo, Indicador, AgendaSemana, AgendaActividad } from "@/types/database";
+
+// Devuelve el lunes ISO (YYYY-MM-DD) de la semana de una fecha dada
+export function lunesDeSemana(fecha: Date = new Date()): string {
+  const d = new Date(fecha);
+  const day = d.getDay(); // 0=Sun, 1=Mon, ...
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function getAgendaSemana(
+  unidadId: string,
+  fechaLunes: string
+): Promise<(AgendaSemana & { actividades: AgendaActividad[] }) | null> {
+  const { data, error } = await supabase
+    .from("agenda_semana")
+    .select("*, actividades:agenda_actividad(*)")
+    .eq("unidad_id", unidadId)
+    .eq("fecha_lunes", fechaLunes)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const sem = data as AgendaSemana & { actividades: AgendaActividad[] };
+  sem.actividades = (sem.actividades ?? []).sort((a, b) =>
+    a.dia_semana === b.dia_semana ? a.orden - b.orden : a.dia_semana - b.dia_semana
+  );
+  return sem;
+}
+
+export async function getAgendasSemana(fechaLunes: string): Promise<AgendaSemana[]> {
+  const { data, error } = await supabase
+    .from("agenda_semana")
+    .select("*, unidad:unidad_organizacional(*), actividades:agenda_actividad(*)")
+    .eq("fecha_lunes", fechaLunes);
+  if (error) throw error;
+  return (data ?? []) as AgendaSemana[];
+}
 
 // -------------------------------------------------------
 // Queries server-side para alimentar las vistas.
@@ -92,6 +129,27 @@ export async function getTodosLosHitos(periodoId: string) {
   return data ?? [];
 }
 
+export async function getIndicadores(): Promise<Indicador[]> {
+  const { data, error } = await supabase
+    .from("indicador")
+    .select("*, meta:meta(*, proyecto:proyecto(id, nombre, codigo, unidad_id))")
+    .is("deleted_at", null)
+    .order("orden");
+  if (error) throw error;
+  return (data ?? []) as Indicador[];
+}
+
+export async function getIndicadoresPorMeta(metaId: string): Promise<Indicador[]> {
+  const { data, error } = await supabase
+    .from("indicador")
+    .select("*")
+    .eq("meta_id", metaId)
+    .is("deleted_at", null)
+    .order("orden");
+  if (error) throw error;
+  return (data ?? []) as Indicador[];
+}
+
 export async function getResumenDashboard(periodoId: string) {
   const proyectos = await getProyectos(periodoId);
   const proyectoIds = proyectos.map((p) => p.id);
@@ -104,6 +162,31 @@ export async function getResumenDashboard(periodoId: string) {
   if (metasError) throw metasError;
 
   const metas = (metasData ?? []) as Meta[];
+
+  // Indicadores: count vía join inverso (evita mandar 700+ UUIDs en la URL)
+  let totalIndicadores = 0;
+  const indicadoresSemaforo = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
+  {
+    const estados = ["verde", "amarillo", "rojo", "sin_datos"] as const;
+    const baseQuery = () =>
+      supabase
+        .from("indicador")
+        .select("id, meta:meta!inner(id, proyecto:proyecto!inner(id, periodo_id))", {
+          count: "exact",
+          head: true,
+        })
+        .eq("meta.proyecto.periodo_id", periodoId)
+        .is("deleted_at", null);
+
+    const [{ count: total }, ...porEstado] = await Promise.all([
+      baseQuery(),
+      ...estados.map((e) => baseQuery().eq("estado_semaforo", e)),
+    ]);
+    totalIndicadores = total ?? 0;
+    estados.forEach((e, i) => {
+      indicadoresSemaforo[e] = porEstado[i].count ?? 0;
+    });
+  }
 
   const { data: hitosData, error: hitosError } = await supabase
     .from("hito")
@@ -189,5 +272,7 @@ export async function getResumenDashboard(periodoId: string) {
     hitosTotal,
     hitosVencidos,
     proximoHito,
+    totalIndicadores,
+    indicadoresSemaforo,
   };
 }

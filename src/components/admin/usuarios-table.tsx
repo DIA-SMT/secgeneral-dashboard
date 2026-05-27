@@ -1,0 +1,196 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { actualizarPerfil, desactivarPerfil } from "@/lib/actions";
+import type { PerfilUsuario, UnidadOrganizacional, RolUsuario } from "@/types/database";
+
+const ROLES: { value: RolUsuario; label: string }[] = [
+  { value: "intendenta", label: "Intendenta" },
+  { value: "secretario", label: "Secretario" },
+  { value: "subsecretario", label: "Subsecretario" },
+  { value: "director", label: "Director" },
+  { value: "admin_funcional", label: "Admin funcional (Planif. Estratégica)" },
+  { value: "admin_tecnico", label: "Admin técnico (Sistemas)" },
+];
+
+interface Props {
+  perfiles: PerfilUsuario[];
+  unidades: UnidadOrganizacional[];
+  rolActual: RolUsuario;
+}
+
+export function UsuariosTable({ perfiles, unidades, rolActual }: Props) {
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const unidadesByNivel = (nivel: number) =>
+    unidades.filter((u) => u.nivel === nivel).sort((a, b) =>
+      (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre)
+    );
+
+  return (
+    <div className="rounded-xl border border-border bg-surface overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-border/30 text-xs uppercase tracking-wider text-muted">
+          <tr>
+            <th className="text-left p-3">Nombre / Email</th>
+            <th className="text-left p-3">Rol</th>
+            <th className="text-left p-3">Unidad</th>
+            <th className="text-left p-3">Estado</th>
+            <th className="p-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {perfiles.map((p) => (
+            <UsuarioRow
+              key={p.user_id}
+              perfil={p}
+              unidades={unidades}
+              unidadesByNivel={unidadesByNivel}
+              editing={editing === p.user_id}
+              onEdit={() => setEditing(p.user_id)}
+              onCancel={() => setEditing(null)}
+              rolActual={rolActual}
+            />
+          ))}
+        </tbody>
+      </table>
+
+      <div className="p-4 border-t border-border bg-border/10 text-xs text-muted">
+        Para crear nuevos usuarios usá el panel de Supabase Auth (Authentication → Users → Add user)
+        y luego asigná el perfil acá. O ejecutá el script <code className="text-foreground">300_seed_usuarios.ts</code>.
+      </div>
+    </div>
+  );
+}
+
+function UsuarioRow({
+  perfil,
+  unidades,
+  unidadesByNivel,
+  editing,
+  onEdit,
+  onCancel,
+  rolActual,
+}: {
+  perfil: PerfilUsuario;
+  unidades: UnidadOrganizacional[];
+  unidadesByNivel: (nivel: number) => UnidadOrganizacional[];
+  editing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  rolActual: RolUsuario;
+}) {
+  const [rol, setRol] = useState<RolUsuario>(perfil.rol);
+  const [unidadId, setUnidadId] = useState<string | null>(perfil.unidad_id);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const requierUnidad = rol === "secretario" || rol === "subsecretario" || rol === "director";
+  const nivelEsperado = rol === "secretario" ? 0 : rol === "subsecretario" ? 1 : 2;
+  const unidadesParaRol = requierUnidad ? unidadesByNivel(nivelEsperado) : [];
+
+  const guardar = () => {
+    setError(null);
+    if (requierUnidad && !unidadId) {
+      setError("Este rol requiere asignar una unidad");
+      return;
+    }
+    startTransition(async () => {
+      const r = await actualizarPerfil({
+        user_id: perfil.user_id,
+        rol,
+        unidad_id: requierUnidad ? unidadId : null,
+      });
+      if (!r.success) setError(r.error ?? "Error al guardar");
+      else onCancel();
+    });
+  };
+
+  const desactivar = () => {
+    if (!confirm(`Desactivar a ${perfil.nombre ?? perfil.email}?`)) return;
+    startTransition(async () => {
+      await desactivarPerfil(perfil.user_id);
+    });
+  };
+
+  const unidadActual = unidades.find((u) => u.id === perfil.unidad_id);
+
+  return (
+    <tr className="border-t border-border">
+      <td className="p-3">
+        <p className="text-foreground font-medium">{perfil.nombre ?? "—"}</p>
+        <p className="text-xs text-muted">{perfil.email}</p>
+      </td>
+      <td className="p-3">
+        {editing ? (
+          <select
+            value={rol}
+            onChange={(e) => {
+              const nuevo = e.target.value as RolUsuario;
+              setRol(nuevo);
+              if (!["secretario", "subsecretario", "director"].includes(nuevo)) setUnidadId(null);
+            }}
+            className="text-xs bg-background border border-border rounded px-2 py-1"
+          >
+            {ROLES.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-xs capitalize">{perfil.rol.replace("_", " ")}</span>
+        )}
+      </td>
+      <td className="p-3 text-xs">
+        {editing && requierUnidad ? (
+          <select
+            value={unidadId ?? ""}
+            onChange={(e) => setUnidadId(e.target.value || null)}
+            className="text-xs bg-background border border-border rounded px-2 py-1"
+          >
+            <option value="">Seleccionar...</option>
+            {unidadesParaRol.map((u) => (
+              <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
+            ))}
+          </select>
+        ) : (
+          unidadActual ? (unidadActual.nombre_corto ?? unidadActual.nombre) : <span className="text-muted">global</span>
+        )}
+      </td>
+      <td className="p-3">
+        <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${
+          perfil.activo ? "bg-success/20 text-success" : "bg-muted/20 text-muted"
+        }`}>
+          {perfil.activo ? "activo" : "inactivo"}
+        </span>
+      </td>
+      <td className="p-3 text-right">
+        {editing ? (
+          <div className="flex items-center gap-2 justify-end">
+            <button
+              onClick={guardar}
+              disabled={isPending}
+              className="text-xs text-success hover:text-success/80 disabled:opacity-50"
+            >
+              ✓ Guardar
+            </button>
+            <button onClick={onCancel} className="text-xs text-muted hover:text-foreground">
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 justify-end">
+            <button onClick={onEdit} className="text-xs text-primary hover:text-primary-light">
+              Editar
+            </button>
+            {rolActual === "admin_tecnico" && perfil.activo && (
+              <button onClick={desactivar} className="text-xs text-danger hover:text-danger/80">
+                Desactivar
+              </button>
+            )}
+          </div>
+        )}
+        {error && <p className="text-[10px] text-danger mt-1">{error}</p>}
+      </td>
+    </tr>
+  );
+}

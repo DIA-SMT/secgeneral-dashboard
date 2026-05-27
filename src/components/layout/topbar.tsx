@@ -2,24 +2,63 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
+import { getSupabaseBrowser } from "@/lib/supabase/browser";
+import type { RolUsuario } from "@/types/database";
 
-const navItems = [
+type NavItem = { href: string; label: string; icon: string; roles?: RolUsuario[] };
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
+  { href: "/indicadores", label: "Indicadores", icon: "◉" },
+  { href: "/agenda", label: "Agenda", icon: "▤" },
   { href: "/estructura", label: "Estructura", icon: "◈" },
-  { href: "/hitos", label: "Hitos", icon: "◆" },
-  { href: "/carga", label: "Cargar", icon: "✎" },
+  {
+    href: "/carga",
+    label: "Cargar",
+    icon: "✎",
+    roles: ["director", "admin_funcional"],
+  },
+  {
+    href: "/validaciones",
+    label: "Validar",
+    icon: "✓",
+    roles: ["subsecretario", "secretario", "admin_funcional"],
+  },
 ];
 
-export function Topbar() {
+const rolLabels: Record<RolUsuario, string> = {
+  intendenta: "Intendenta",
+  secretario: "Secretario",
+  subsecretario: "Subsecretario",
+  director: "Director",
+  admin_funcional: "Planificación Estratégica",
+  admin_tecnico: "Sistemas",
+};
+
+export function Topbar({
+  perfilNombre,
+  rol,
+}: {
+  perfilNombre: string | null;
+  rol: RolUsuario | null;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
+  const visibles = navItems.filter((i) => !i.roles || (rol && i.roles.includes(rol)));
+
+  const logout = async () => {
+    const sb = getSupabaseBrowser();
+    await sb.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
       <div className="flex items-center justify-between h-14 px-4 lg:px-6">
-        {/* Mobile logo */}
         <div className="flex items-center gap-2 lg:hidden">
           <Image
             src="/logos/Logo Muni- Secre dashboard.png"
@@ -30,14 +69,12 @@ export function Topbar() {
           />
         </div>
 
-        {/* Page title (desktop) */}
         <div className="hidden lg:block">
           <h2 className="text-sm font-medium text-muted">
-            Secretaría General — POA 2026
+            PLANIFICACIÓN OPERATIVA ANUAL 2026
           </h2>
         </div>
 
-        {/* Right side */}
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted hidden sm:inline">
             {new Date().toLocaleDateString("es-AR", {
@@ -46,13 +83,27 @@ export function Topbar() {
               month: "long",
             })}
           </span>
+          {perfilNombre && (
+            <div className="hidden md:flex items-center gap-2 text-xs">
+              <div className="text-right">
+                <p className="text-foreground font-medium">{perfilNombre}</p>
+                {rol && <p className="text-muted text-[10px]">{rolLabels[rol]}</p>}
+              </div>
+              <button
+                onClick={logout}
+                title="Cerrar sesión"
+                className="text-muted hover:text-foreground border border-border rounded px-2 py-1"
+              >
+                ⎋
+              </button>
+            </div>
+          )}
           <ThemeToggle />
         </div>
       </div>
 
-      {/* Mobile navigation */}
       <nav className="flex lg:hidden border-t border-border overflow-x-auto">
-        {navItems.map((item) => {
+        {visibles.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link

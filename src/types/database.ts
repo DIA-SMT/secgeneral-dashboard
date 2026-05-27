@@ -6,7 +6,15 @@ export type EstadoSemaforo = "verde" | "amarillo" | "rojo" | "gris" | "sin_datos
 export type EstadoProyecto = "borrador" | "activo" | "pausado" | "completado" | "cancelado";
 export type TipoMedicion = "cuantitativo" | "cualitativo" | "hito_unico";
 export type TipoUnidad = "secretaria" | "subsecretaria" | "direccion" | "departamento" | "coordinacion" | "otro";
-export type FuenteAvance = "manual" | "importacion" | "chatbot" | "audio";
+export type FuenteAvance = "manual" | "importacion" | "chatbot" | "audio" | "correccion";
+export type RolUsuario =
+  | "intendenta"
+  | "secretario"
+  | "subsecretario"
+  | "director"
+  | "admin_funcional"
+  | "admin_tecnico";
+export type EstadoValidacion = "pendiente" | "validado" | "observado";
 export type FrecuenciaMedicion = "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | "puntual";
 
 export interface UnidadOrganizacional {
@@ -19,6 +27,7 @@ export interface UnidadOrganizacional {
   orden: number;
   responsable_nombre: string | null;
   activa: boolean;
+  codigo: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -129,6 +138,72 @@ export interface Avance {
   observacion: string | null;
   created_by: string | null;
   payload_original: Record<string, unknown> | null;
+  reemplaza_avance_id: string | null;
+  estado_validacion: EstadoValidacion;
+  validado_por: string | null;
+  validado_at: string | null;
+  observacion_validacion: string | null;
+  created_at: string;
+}
+
+export interface PerfilUsuario {
+  user_id: string;
+  email: string;
+  nombre: string | null;
+  rol: RolUsuario;
+  unidad_id: string | null;
+  activo: boolean;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  unidad?: UnidadOrganizacional;
+}
+
+export interface Indicador {
+  id: string;
+  meta_id: string;
+  codigo: string | null;
+  nombre: string;
+  descripcion: string | null;
+  formula: string | null;
+  unidad_medida: string | null;
+  valor_actual: number | null;
+  valor_objetivo: number | null;
+  estado_semaforo: EstadoSemaforo;
+  ultima_actualizacion: string | null;
+  orden: number;
+  metadata: Record<string, unknown>;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  meta?: Meta;
+}
+
+export interface AgendaSemana {
+  id: string;
+  unidad_id: string;
+  fecha_lunes: string;
+  formato_libre: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  // Joined
+  unidad?: UnidadOrganizacional;
+  actividades?: AgendaActividad[];
+}
+
+export interface AgendaActividad {
+  id: string;
+  agenda_semana_id: string;
+  dia_semana: number; // 1=Lunes ... 7=Domingo
+  orden: number;
+  es_feriado: boolean;
+  actividad: string;
+  lugar: string | null;
+  horario: string | null;
+  observacion: string | null;
   created_at: string;
 }
 
@@ -149,6 +224,10 @@ export interface Database {
       meta: TableDefinition<Meta>;
       hito: TableDefinition<Hito>;
       avance: TableDefinition<Avance>;
+      indicador: TableDefinition<Indicador>;
+      agenda_semana: TableDefinition<AgendaSemana>;
+      agenda_actividad: TableDefinition<AgendaActividad>;
+      perfil_usuario: TableDefinition<PerfilUsuario>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

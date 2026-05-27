@@ -11,7 +11,7 @@ import { Suspense } from "react";
 export const revalidate = 60;
 
 interface Props {
-  searchParams: Promise<{ q?: string; dir?: string }>;
+  searchParams: Promise<{ q?: string; dir?: string; estado?: string }>;
 }
 
 export default async function ProyectosPage({ searchParams }: Props) {
@@ -45,7 +45,20 @@ export default async function ProyectosPage({ searchParams }: Props) {
     );
   }
   if (params.dir) {
-    filtrados = filtrados.filter((p) => p.unidad_id === params.dir);
+    // Filtrar por la unidad seleccionada Y todos sus descendientes
+    const descendientes = (id: string): string[] => {
+      const directos = unidades.filter((u) => u.parent_id === id).map((u) => u.id);
+      return [id, ...directos.flatMap((d) => descendientes(d))];
+    };
+    const dirIds = new Set(descendientes(params.dir));
+    filtrados = filtrados.filter((p) => dirIds.has(p.unidad_id));
+  }
+  if (params.estado && params.estado !== "todos") {
+    filtrados = filtrados.filter((p) => {
+      const metas = metasPorPy.get(p.id) ?? [];
+      const { estado } = calcularEstadoProyecto(metas);
+      return estado === params.estado;
+    });
   }
 
   // Agrupar por direccion
@@ -57,7 +70,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
     pysPorDir.set(py.unidad_id, arr);
   }
 
-  const hayFiltro = !!params.q || !!params.dir;
+  const hayFiltro = !!params.q || !!params.dir || (!!params.estado && params.estado !== "todos");
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -69,7 +82,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
           </p>
         </div>
         <Suspense>
-          <ProyectosSearch direcciones={direcciones} />
+          <ProyectosSearch unidades={unidades} />
         </Suspense>
       </div>
 

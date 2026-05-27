@@ -194,4 +194,128 @@ export const chatTools: Tool[] = [
       required: ["propuesta_id"],
     },
   },
+
+  // --- Tools de Indicadores (V2) ---
+  {
+    name: "obtener_indicadores_de_meta",
+    description:
+      "Lista los indicadores medibles de una meta específica con sus valores actuales, objetivos y semáforo. Usar cuando el usuario pregunta por los indicadores de una meta, o necesita ver el detalle de medición.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        meta_id: { type: "string", description: "UUID de la meta." },
+      },
+      required: ["meta_id"],
+    },
+  },
+  {
+    name: "actualizar_indicador",
+    description:
+      "Actualiza el valor actual de un indicador. Esta es una acción directa (no requiere propuesta intermedia) pero conviene confirmar brevemente con el usuario antes de invocarla. Solo Directores de la unidad y admin_funcional pueden usarla.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        indicador_id: { type: "string", description: "UUID del indicador." },
+        valor_actual: { type: "number", description: "Nuevo valor numérico del indicador." },
+      },
+      required: ["indicador_id", "valor_actual"],
+    },
+  },
+
+  // --- Tools de Validación (V2) ---
+  {
+    name: "listar_avances_pendientes_validacion",
+    description:
+      "Lista los avances con estado_validacion='pendiente' en el scope del usuario. Útil para Subsecretarios que necesitan ver qué cargas tienen que validar.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        unidad_id: {
+          type: "string",
+          description: "UUID de la subsecretaría o dirección para filtrar (opcional).",
+        },
+      },
+    },
+  },
+  {
+    name: "validar_avance_chat",
+    description:
+      "Marca un avance como validado. Solo Subsecretarios o admin_funcional. Confirmar acción con el usuario antes de invocar.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        avance_id: { type: "string", description: "UUID del avance a validar." },
+      },
+      required: ["avance_id"],
+    },
+  },
+  {
+    name: "observar_avance_chat",
+    description:
+      "Marca un avance como observado (rechazado) con un motivo. El Director debe corregirlo después. Solo Subsecretarios o admin_funcional. El motivo es obligatorio.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        avance_id: { type: "string", description: "UUID del avance a observar." },
+        motivo: { type: "string", description: "Texto del motivo de la observación (obligatorio)." },
+      },
+      required: ["avance_id", "motivo"],
+    },
+  },
+
+  // --- Tools de Agenda Semanal (V2) ---
+  {
+    name: "obtener_agenda_semana",
+    description:
+      "Obtiene la agenda semanal de una unidad para una semana específica (lunes a domingo). Si no se pasa fecha_lunes, devuelve la semana actual.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        unidad_id: { type: "string", description: "UUID de la unidad organizacional." },
+        fecha_lunes: {
+          type: "string",
+          description: "Fecha del lunes de la semana (formato YYYY-MM-DD). Opcional: default es la semana actual.",
+        },
+      },
+      required: ["unidad_id"],
+    },
+  },
+  {
+    name: "proponer_actividad_agenda",
+    description:
+      "Arma una propuesta para agregar una actividad a la agenda semanal de una unidad. NO ejecuta el cambio: prepara la propuesta para confirmación del usuario.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        unidad_id: { type: "string", description: "UUID de la unidad." },
+        dia_semana: {
+          type: "number",
+          description: "Día de la semana (1=Lunes, 2=Martes, ... 7=Domingo).",
+        },
+        actividad: { type: "string", description: "Descripción de la actividad." },
+        lugar: { type: "string", description: "Lugar donde se realiza (opcional)." },
+        horario: {
+          type: "string",
+          description: 'Horario como texto libre ("08:00", "09:00 a 12:00", "24hs"). Opcional.',
+        },
+        fecha_lunes: {
+          type: "string",
+          description: "Fecha del lunes de la semana objetivo (YYYY-MM-DD). Default: semana actual.",
+        },
+      },
+      required: ["unidad_id", "dia_semana", "actividad"],
+    },
+  },
+  {
+    name: "confirmar_actividad_agenda",
+    description:
+      "Ejecuta la propuesta de actividad de agenda previamente armada. SOLO invocar tras confirmación explícita del usuario.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        propuesta_id: { type: "string", description: "UUID de la propuesta a confirmar." },
+      },
+      required: ["propuesta_id"],
+    },
+  },
 ];

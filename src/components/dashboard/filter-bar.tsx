@@ -28,25 +28,40 @@ export function FilterBar({ unidades }: FilterBarProps) {
     [router, searchParams]
   );
 
-  // Solo subsecretarías (nivel 1) como opciones de filtro
-  const subsecretarias = unidades.filter((u) => u.nivel === 1);
+  const sortByName = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>
+    (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre);
+  const secretarias = unidades.filter((u) => u.nivel === 0).sort(sortByName);
+  const subsecretarias = unidades.filter((u) => u.nivel === 1).sort(sortByName);
+  const direcciones = unidades.filter((u) => u.nivel >= 2).sort(sortByName);
 
   return (
     <div className="flex flex-wrap items-center gap-3">
       <span className="text-xs text-muted uppercase tracking-wider">Filtrar</span>
 
-      {/* Filtro por unidad */}
+      {/* Filtro por unidad: Secretarías, Subsecretarías, Direcciones */}
       <select
         value={currentUnidad}
         onChange={(e) => setFilter("unidad", e.target.value)}
         className="text-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-foreground focus:outline-none focus:border-primary/50 cursor-pointer"
       >
         <option value="todas">Todas las áreas</option>
-        {subsecretarias.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.nombre_corto ?? u.nombre}
-          </option>
-        ))}
+        {secretarias.length > 0 && (
+          <optgroup label="Secretarías">
+            {secretarias.map((u) => (
+              <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="Subsecretarías">
+          {subsecretarias.map((u) => (
+            <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
+          ))}
+        </optgroup>
+        <optgroup label="Direcciones">
+          {direcciones.map((u) => (
+            <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
+          ))}
+        </optgroup>
       </select>
 
       {/* Filtro por estado */}
@@ -61,9 +76,9 @@ export function FilterBar({ unidades }: FilterBarProps) {
           };
           const labels: Record<string, string> = {
             todos: "Todos",
-            verde: "Al día",
-            amarillo: "Atención",
-            rojo: "En riesgo",
+            verde: "FINALIZADO",
+            amarillo: "EN EJECUCIÓN",
+            rojo: "NO INICIADO",
           };
           return (
             <button

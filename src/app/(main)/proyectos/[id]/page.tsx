@@ -1,9 +1,14 @@
 import { getProyecto, getMetasPorProyecto, getHitosPorProyecto, getAvancesPorProyecto } from "@/lib/queries";
+import { supabase } from "@/lib/supabase";
+import type { Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { MetaCardWithForm } from "@/components/dashboard/meta-card-with-form";
 import { HitoActions } from "@/components/dashboard/hito-actions";
+import { AvancesList } from "@/components/dashboard/avances-list";
+import { getPerfilActual } from "@/lib/auth";
 import { formatFecha, formatFechaRelativa, calcularEstadoProyecto } from "@/lib/utils";
+import { BackButton } from "@/components/layout/back-button";
 import Link from "next/link";
 
 export const revalidate = 60;
@@ -21,17 +26,38 @@ export default async function ProyectoDetallePage({
     getAvancesPorProyecto(id),
   ]);
 
+  const { data: indData } = await supabase
+    .from("indicador")
+    .select("*")
+    .in("meta_id", metas.map((m) => m.id))
+    .is("deleted_at", null)
+    .order("orden");
+  const indicadores = (indData ?? []) as Indicador[];
+  const indicadoresPorMeta = new Map<string, Indicador[]>();
+  for (const i of indicadores) {
+    (indicadoresPorMeta.get(i.meta_id) ?? indicadoresPorMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
+  }
+
+  const perfil = await getPerfilActual();
+  const puedeCargar =
+    !!perfil &&
+    (perfil.rol === "admin_funcional" ||
+      (perfil.rol === "director" && perfil.unidad_id === proyecto.unidad_id));
+
   const { porcentaje: avgPct, estado: estadoGlobal, tieneSeguimiento } = calcularEstadoProyecto(metas);
   const ahora = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-muted">
-        <Link href="/proyectos" className="hover:text-primary transition-colors">Proyectos</Link>
-        <span>/</span>
-        <span className="text-foreground line-clamp-1">{proyecto.nombre}</span>
-      </nav>
+      {/* Back + Breadcrumb */}
+      <div className="flex items-center justify-between gap-3">
+        <BackButton fallback="/proyectos" />
+        <nav className="flex items-center gap-2 text-sm text-muted min-w-0">
+          <Link href="/proyectos" className="hover:text-primary transition-colors">Proyectos</Link>
+          <span>/</span>
+          <span className="text-foreground line-clamp-1">{proyecto.nombre}</span>
+        </nav>
+      </div>
 
       {/* Header */}
       <div className="rounded-xl border border-border bg-surface p-6">
@@ -83,7 +109,13 @@ export default async function ProyectoDetallePage({
         <h2 className="text-lg font-semibold text-foreground mb-3">Metas ({metas.length})</h2>
         <div className="space-y-3">
           {metas.map((meta) => (
-            <MetaCardWithForm key={meta.id} meta={meta} proyectoId={proyecto.id} />
+            <MetaCardWithForm
+              key={meta.id}
+              meta={meta}
+              proyectoId={proyecto.id}
+              indicadores={indicadoresPorMeta.get(meta.id) ?? []}
+              puedeCargar={puedeCargar}
+            />
           ))}
         </div>
       </div>
@@ -131,19 +163,7 @@ export default async function ProyectoDetallePage({
       {avances.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-3">Últimos avances</h2>
-          <div className="space-y-2">
-            {avances.slice(0, 10).map((avance) => (
-              <div key={avance.id} className="rounded-lg border border-border bg-surface p-3 text-sm">
-                <div className="flex items-center justify-between text-xs text-muted mb-1">
-                  <span>{formatFecha(avance.fecha_reporte)}</span>
-                  <span className="capitalize bg-border/50 px-1.5 py-0.5 rounded text-[10px]">{avance.fuente}</span>
-                </div>
-                {avance.valor_numerico != null && <p className="text-foreground font-medium">Valor: {avance.valor_numerico}</p>}
-                {avance.valor_cualitativo && <p className="text-foreground font-medium">Nivel: {avance.valor_cualitativo}</p>}
-                {avance.observacion && <p className="text-muted mt-0.5">{avance.observacion}</p>}
-              </div>
-            ))}
-          </div>
+          <AvancesList avances={avances} metas={metas} proyectoId={proyecto.id} puedeCorregir={puedeCargar} />
         </div>
       )}
 

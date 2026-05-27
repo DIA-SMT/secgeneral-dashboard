@@ -4,16 +4,17 @@ import { CircularProgress } from "@/components/ui/circular-progress";
 import { SemaforoSummary } from "@/components/ui/semaforo-summary";
 import { ProyectoCard } from "@/components/dashboard/proyecto-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
+import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatFecha, calcularEstadoProyecto } from "@/lib/utils";
 import type { EstadoSemaforo, Meta, UnidadOrganizacional } from "@/types/database";
 import { Suspense } from "react";
 import Link from "next/link";
 
-export const revalidate = 60;
+export const revalidate = 0; // sin cache mientras estamos cargando data
 
 interface Props {
-  searchParams: Promise<{ unidad?: string; estado?: string }>;
+  searchParams: Promise<{ unidad?: string; estado?: string; scope?: string }>;
 }
 
 export default async function DashboardPage({ searchParams }: Props) {
@@ -22,7 +23,31 @@ export default async function DashboardPage({ searchParams }: Props) {
   const resumen = await getResumenDashboard(periodo.id);
   const unidades = await getUnidades();
 
-  const proyectosActivos = resumen.proyectos.filter((p) => p.estado === "activo");
+  // Aplicar scope (filtra todo el dashboard por una rama del organigrama)
+  const scopeId = params.scope;
+  const descendientes = (id: string): string[] => {
+    const directos = unidades.filter((u) => u.parent_id === id).map((u) => u.id);
+    return [id, ...directos.flatMap((d) => descendientes(d))];
+  };
+  const scopeUnidadIds = scopeId ? new Set(descendientes(scopeId)) : null;
+
+  const proyectosScope = scopeUnidadIds
+    ? resumen.proyectos.filter((p) => scopeUnidadIds.has(p.unidad_id))
+    : resumen.proyectos;
+  const proyectoIdsScope = new Set(proyectosScope.map((p) => p.id));
+  const metasScope = scopeUnidadIds
+    ? resumen.metas.filter((m) => proyectoIdsScope.has(m.proyecto_id))
+    : resumen.metas;
+  const metasSemaforoScope = {
+    verde: metasScope.filter((m) => m.estado_semaforo === "verde").length,
+    amarillo: metasScope.filter((m) => m.estado_semaforo === "amarillo").length,
+    rojo: metasScope.filter((m) => m.estado_semaforo === "rojo").length,
+    sin_datos: metasScope.filter(
+      (m) => m.estado_semaforo === "sin_datos" || m.estado_semaforo === "gris"
+    ).length,
+  };
+
+  const proyectosActivos = proyectosScope.filter((p) => p.estado === "activo");
 
   const estadoGlobal: EstadoSemaforo = !resumen.tieneSeguimiento
     ? "sin_datos"
@@ -39,12 +64,12 @@ export default async function DashboardPage({ searchParams }: Props) {
     direccionesPorSubsec.set(sub.id, unidades.filter((u) => u.parent_id === sub.id));
   }
 
-  // Filtrado
+  const scopeUnidad = scopeId ? unidades.find((u) => u.id === scopeId) ?? null : null;
+
+  // Filtrado (sobre el scope ya aplicado)
   let proyectosFiltrados = proyectosActivos;
   if (params.unidad) {
-    const unidadHijos = unidades
-      .filter((u) => u.id === params.unidad || u.parent_id === params.unidad)
-      .map((u) => u.id);
+    const unidadHijos = descendientes(params.unidad);
     proyectosFiltrados = proyectosFiltrados.filter((p) => unidadHijos.includes(p.unidad_id));
   }
   if (params.estado && params.estado !== "todos") {
@@ -60,9 +85,12 @@ export default async function DashboardPage({ searchParams }: Props) {
     <div className="space-y-8 max-w-7xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">Panel Ejecutivo</h1>
-          <p className="text-sm text-muted mt-1">{periodo.nombre}</p>
+          <Suspense><ScopeSelector unidades={unidades} /></Suspense>
+          {scopeUnidad && (
+            <p className="mt-1 text-xs text-muted">Ámbito: {scopeUnidad.nombre}</p>
+          )}
         </div>
         <Link href="/tv" target="_blank"
           className="text-xs text-muted hover:text-accent border border-border hover:border-accent/30 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5 self-start">
@@ -88,7 +116,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
       )}
 
-      {/* KPIs */}
+      {/* KPIs: Avance global → Proyectos → Metas → Indicadores */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="sm:col-span-2 lg:col-span-1 rounded-2xl border border-border bg-surface p-6 flex items-center gap-6">
           {resumen.tieneSeguimiento && resumen.porcentajeGlobal != null ? (
@@ -108,34 +136,38 @@ export default async function DashboardPage({ searchParams }: Props) {
           </div>
         </div>
 
-        <KpiCard label="Metas" value={resumen.totalMetas}
-          sublabel={resumen.tieneSeguimiento
-            ? `${resumen.metasSemaforo.verde} al día · ${resumen.metasSemaforo.rojo} en riesgo`
-            : "Pendientes de seguimiento"}
-          accent="accent" />
+        <Link href="/proyectos" className="block hover:scale-[1.02] transition-transform">
+          <KpiCard label="Proyectos" value={proyectosActivos.length}
+            sublabel={`de ${proyectosScope.length} en POA`}
+            accent="success" />
+        </Link>
 
-        <KpiCard label="Hitos" value={`${resumen.hitosCompletados}/${resumen.hitosTotal}`}
-          sublabel={resumen.hitosVencidos > 0
-            ? `${resumen.hitosVencidos} con fecha vencida`
-            : resumen.proximoHito
-            ? `Próximo: ${resumen.proximoHito.nombre}`
-            : "Sin hitos próximos"}
-          accent={resumen.hitosVencidos > 0 ? "warning" : "primary"} />
+        <Link href="/metas" className="block hover:scale-[1.02] transition-transform">
+          <KpiCard label="Metas" value={metasScope.length}
+            sublabel={resumen.tieneSeguimiento
+              ? `${metasSemaforoScope.verde} finalizadas · ${metasSemaforoScope.rojo} no iniciadas`
+              : "Pendientes de seguimiento"}
+            accent="accent" />
+        </Link>
 
-        <KpiCard label="Proyectos" value={proyectosActivos.length}
-          sublabel={`de ${resumen.proyectos.length} en POA`}
-          accent="success" />
+        <Link href="/indicadores" className="block hover:scale-[1.02] transition-transform">
+          <KpiCard label="Indicadores" value={resumen.totalIndicadores}
+            sublabel={resumen.totalIndicadores > 0
+              ? `${resumen.indicadoresSemaforo.verde} en verde · ${resumen.indicadoresSemaforo.rojo} en rojo`
+              : "Sin indicadores cargados"}
+            accent="primary" />
+        </Link>
       </div>
 
-      {/* Semaforo + proximo hito */}
+      {/* Grado de avance + proximo hito */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-border bg-surface p-5">
-          <p className="text-xs text-muted uppercase tracking-widest mb-3">Distribución de metas</p>
+          <p className="text-xs text-muted uppercase tracking-widest mb-3">Grado de avance de los proyectos</p>
           <SemaforoSummary
-            verde={resumen.metasSemaforo.verde}
-            amarillo={resumen.metasSemaforo.amarillo}
-            rojo={resumen.metasSemaforo.rojo}
-            sin_datos={resumen.metasSemaforo.sin_datos} />
+            verde={metasSemaforoScope.verde}
+            amarillo={metasSemaforoScope.amarillo}
+            rojo={metasSemaforoScope.rojo}
+            sin_datos={metasSemaforoScope.sin_datos} />
         </div>
 
         {resumen.proximoHito?.fecha_esperada ? (
