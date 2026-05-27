@@ -61,17 +61,29 @@ export function Topbar({
       <div className="flex items-center justify-between h-14 px-4 lg:px-6">
         <div className="flex items-center gap-2 lg:hidden">
           <Image
-            src="/logos/Logo Muni- Secre dashboard.png"
-            alt="Ciudad SMT"
-            width={120}
-            height={34}
-            className="logo-auto h-7 w-auto"
+            src="/logos/logoMuni-sm.png"
+            alt="PlanIA"
+            width={28}
+            height={28}
+            className="h-7 w-7"
           />
+          <span className="text-base font-bold tracking-tight">
+            <span>Plan</span><span className="text-primary">IA</span>
+          </span>
         </div>
 
-        <div className="hidden lg:block">
-          <h2 className="text-sm font-medium text-muted">
-            PLANIFICACIÓN OPERATIVA ANUAL 2026
+        <div className="hidden lg:flex items-center gap-2">
+          <Image
+            src="/logos/logoMuni-sm.png"
+            alt="PlanIA"
+            width={28}
+            height={28}
+            className="h-7 w-7"
+          />
+          <h2 className="text-sm font-medium text-foreground">
+            <span className="font-bold">Plan</span>
+            <span className="font-bold text-primary">IA</span>
+            <span className="text-muted ml-2 font-normal">· Planificación Operativa Anual 2026</span>
           </h2>
         </div>
 

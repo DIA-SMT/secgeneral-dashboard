@@ -2,7 +2,7 @@ import { LoginForm } from "@/components/auth/login-form";
 import Image from "next/image";
 import { Suspense } from "react";
 
-export const metadata = { title: "Iniciar sesión — POA 2026" };
+export const metadata = { title: "Iniciar sesión" };
 
 export default function LoginPage() {
   return (
@@ -10,16 +10,21 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 space-y-6">
         <div className="flex flex-col items-center gap-3">
           <Image
-            src="/logos/Logo Muni- Secre dashboard.png"
-            alt="Muni SMT"
-            width={140}
-            height={40}
-            className="logo-auto h-10 w-auto"
+            src="/logos/logoMuni-sm.png"
+            alt="PlanIA"
+            width={64}
+            height={64}
+            className="h-16 w-16"
             priority
           />
           <div className="text-center">
-            <h1 className="text-lg font-bold text-foreground">Planificación Operativa Anual 2026</h1>
-            <p className="text-xs text-muted mt-1">Iniciá sesión para continuar</p>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">
+              <span>Plan</span><span className="text-primary">IA</span>
+            </h1>
+            <p className="text-xs text-muted mt-1">
+              Plan Operativo Anual 2026 · Municipalidad de SMT
+            </p>
+            <p className="text-xs text-muted mt-3">Iniciá sesión para continuar</p>
           </div>
         </div>
 

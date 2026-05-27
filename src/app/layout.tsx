@@ -10,9 +10,18 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Secretaría General — Dashboard Ejecutivo",
+  title: {
+    default: "PlanIA — Plan Operativo Anual 2026",
+    template: "%s — PlanIA",
+  },
   description:
-    "Sistema de seguimiento de la Planificación Operativa Anual — Municipalidad de San Miguel de Tucumán",
+    "PlanIA · Sistema de planificación, monitoreo y evaluación del POA 2026 con asistencia de Inteligencia Artificial — Municipalidad de San Miguel de Tucumán",
+  applicationName: "PlanIA",
+  icons: {
+    icon: "/logos/logoMuni-sm.png",
+    apple: "/logos/logoMuni-sm.png",
+    shortcut: "/logos/logoMuni-sm.png",
+  },
 };
 
 export default function RootLayout({

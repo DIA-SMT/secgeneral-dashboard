@@ -49,16 +49,18 @@ export default async function TvPage() {
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-5">
           <Image
-            src="/logos/Logo Muni- Secre dashboard.png"
-            alt="Ciudad San Miguel de Tucumán"
-            width={220}
-            height={60}
-            className="logo-auto h-14 w-auto"
+            src="/logos/logoMuni-sm.png"
+            alt="PlanIA"
+            width={56}
+            height={56}
+            className="h-14 w-14"
             priority
           />
           <div className="border-l border-border pl-5">
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Secretaría General</h1>
-            <p className="text-sm text-muted mt-0.5">{periodo.nombre}</p>
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">
+              <span>Plan</span><span className="text-primary">IA</span>
+            </h1>
+            <p className="text-sm text-muted mt-0.5">{periodo.nombre} · Muni SMT</p>
           </div>
         </div>
         <TvClock />

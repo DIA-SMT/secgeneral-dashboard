@@ -45,15 +45,23 @@ export function Sidebar({ rol }: { rol: RolUsuario | null }) {
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-surface min-h-screen">
-      <div className="p-5 border-b border-border">
+      <div className="p-5 border-b border-border flex items-center gap-3">
         <Image
-          src="/logos/Logo Muni- Secre dashboard.png"
-          alt="Ciudad San Miguel de Tucumán"
-          width={180}
-          height={50}
-          className="logo-auto h-10 w-auto"
+          src="/logos/logoMuni-sm.png"
+          alt="PlanIA"
+          width={40}
+          height={40}
+          className="h-10 w-10 shrink-0"
           priority
         />
+        <div className="leading-tight">
+          <p className="text-xl font-bold text-foreground tracking-tight">
+            <span>Plan</span><span className="text-primary">IA</span>
+          </p>
+          <p className="text-[9px] text-muted uppercase tracking-widest">
+            POA 2026 · Muni SMT
+          </p>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -88,9 +96,9 @@ export function Sidebar({ rol }: { rol: RolUsuario | null }) {
           />
         </div>
         <p className="text-[9px] text-muted/60 text-center leading-relaxed">
-          Desarrollo realizado por la Dirección de IA
-          en conjunto con la Dirección de Planificación Estratégica
-          de la Municipalidad de San Miguel de Tucumán
+          <span className="font-semibold">PlanIA</span> · desarrollado por la Dirección
+          de Inteligencia Artificial en conjunto con la Dirección de Planificación
+          Estratégica de la Municipalidad de San Miguel de Tucumán
         </p>
       </div>
     </aside>
