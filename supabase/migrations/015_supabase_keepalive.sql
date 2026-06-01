@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS api.supabase_keepalive (
   hits bigint NOT NULL DEFAULT 0
 );
 
+-- Disable RLS on this table (infrastructure, not user data)
+ALTER TABLE api.supabase_keepalive DISABLE ROW LEVEL SECURITY;
+
 -- 3) RPC function in public schema (required for Supabase REST API exposure)
 -- Idempotent: safe to run multiple times.
 CREATE OR REPLACE FUNCTION public.keepalive()
@@ -35,14 +38,17 @@ BEGIN
 END;
 $body$;
 
--- 4) minimal privileges: allow callers to run only this function and write the dedicated table
+-- 4) minimal privileges
 -- Grant usage on the api schema (required to access objects in it)
 GRANT USAGE ON SCHEMA api TO anon, authenticated;
 
--- Allow the roles to INSERT/UPDATE only on the dedicated table (no SELECT needed)
-GRANT INSERT, UPDATE ON api.supabase_keepalive TO anon, authenticated;
+-- Grant all privileges on the dedicated table to ensure RPC can write
+GRANT INSERT, UPDATE, SELECT ON api.supabase_keepalive TO anon, authenticated;
 
 -- Allow executing the public RPC function
 GRANT EXECUTE ON FUNCTION public.keepalive() TO anon, authenticated;
+
+-- Set default privileges for future migrations in the api schema
+ALTER DEFAULT PRIVILEGES IN SCHEMA api GRANT INSERT, UPDATE, SELECT ON TABLES TO anon, authenticated;
 
 COMMIT;
