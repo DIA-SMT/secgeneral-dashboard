@@ -1,0 +1,38 @@
+name: Supabase keepalive
+
+on:
+  schedule:
+    # twice daily (UTC). Adjust or remove schedules as needed.
+    - cron: '0 6 * * *'
+    - cron: '0 18 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call Supabase keepalive RPC
+        env:
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_PROJECT_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Missing secrets SUPABASE_PROJECT_URL or SUPABASE_ANON_KEY"
+            exit 1
+          fi
+
+          echo "Calling keepalive RPC..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${SUPABASE_PROJECT_URL}/rest/v1/rpc/keepalive" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "Keepalive succeeded"
+          else
+            echo "Keepalive failed"
+            exit 2
+          fi
