@@ -1,21 +1,25 @@
 -- 015_supabase_keepalive.sql
 -- Adds a minimal, schema-safe keepalive mechanism for Supabase Free projects.
 -- Idempotent: safe to run multiple times.
+--
+-- Note: The function must be in public schema to be exposed via Supabase REST API RPC.
+-- The table is in api schema to separate infrastructure from business logic.
 
 BEGIN;
 
--- 1) ensure schema
+-- 1) ensure infrastructure schema
 CREATE SCHEMA IF NOT EXISTS api;
 
--- 2) dedicated table for heartbeat state
+-- 2) dedicated table for heartbeat state (in api schema, not exposed to REST)
 CREATE TABLE IF NOT EXISTS api.supabase_keepalive (
   key text PRIMARY KEY,
   last_seen timestamptz NOT NULL DEFAULT now(),
   hits bigint NOT NULL DEFAULT 0
 );
 
--- 3) idempotent function that upserts a single row and returns a small JSON payload
-CREATE OR REPLACE FUNCTION api.keepalive()
+-- 3) RPC function in public schema (required for Supabase REST API exposure)
+-- Idempotent: safe to run multiple times.
+CREATE OR REPLACE FUNCTION public.keepalive()
   RETURNS jsonb
   LANGUAGE plpgsql
   SECURITY INVOKER
@@ -32,13 +36,13 @@ END;
 $body$;
 
 -- 4) minimal privileges: allow callers to run only this function and write the dedicated table
--- Grant usage on the schema (required to access objects in it)
+-- Grant usage on the api schema (required to access objects in it)
 GRANT USAGE ON SCHEMA api TO anon, authenticated;
 
 -- Allow the roles to INSERT/UPDATE only on the dedicated table (no SELECT needed)
 GRANT INSERT, UPDATE ON api.supabase_keepalive TO anon, authenticated;
 
--- Allow executing the RPC function
-GRANT EXECUTE ON FUNCTION api.keepalive() TO anon, authenticated;
+-- Allow executing the public RPC function
+GRANT EXECUTE ON FUNCTION public.keepalive() TO anon, authenticated;
 
 COMMIT;
