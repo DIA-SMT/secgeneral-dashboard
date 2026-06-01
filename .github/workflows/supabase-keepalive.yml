@@ -18,21 +18,38 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$SUPABASE_PROJECT_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "Missing secrets SUPABASE_PROJECT_URL or SUPABASE_ANON_KEY"
+            echo "❌ Missing secrets SUPABASE_PROJECT_URL or SUPABASE_ANON_KEY"
             exit 1
           fi
 
-          echo "Calling keepalive RPC..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${SUPABASE_PROJECT_URL}/rest/v1/rpc/keepalive" \
+          echo "✓ Secrets found"
+          echo "URL: ${SUPABASE_PROJECT_URL}"
+          
+          ENDPOINT="${SUPABASE_PROJECT_URL}/rest/v1/rpc/keepalive"
+          echo "Endpoint: $ENDPOINT"
+          echo ""
+          echo "Calling keepalive RPC (verbose)..."
+          
+          RESPONSE=$(curl -v -X POST "$ENDPOINT" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
             -H "Content-Type: application/json" \
-            -d '{}')
-
+            -d '{}' 2>&1)
+          
+          echo "$RESPONSE"
+          
+          STATUS=$(echo "$RESPONSE" | grep "< HTTP" | awk '{print $3}')
+          echo ""
           echo "HTTP status: $STATUS"
+          
+          if [ -z "$STATUS" ]; then
+            echo "❌ Could not extract status code"
+            exit 3
+          fi
+          
           if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
-            echo "Keepalive succeeded"
+            echo "✓ Keepalive succeeded"
           else
-            echo "Keepalive failed"
+            echo "❌ Keepalive failed (status: $STATUS)"
             exit 2
           fi
