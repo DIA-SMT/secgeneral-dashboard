@@ -1,0 +1,24 @@
+import { createClient } from "@supabase/supabase-js";
+
+/**
+ * Cliente Supabase con service_role.
+ * BYPASSEA RLS. Usar SOLO en Server Components / Server Actions protegidos
+ * por rol admin. NUNCA exponerlo al cliente.
+ *
+ * Casos de uso típicos:
+ *   - Listar auth.users (admin API)
+ *   - Crear/borrar usuarios desde el panel de admin
+ *   - Operaciones masivas (scripts de seed)
+ */
+export function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Falta configuración: NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY"
+    );
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}

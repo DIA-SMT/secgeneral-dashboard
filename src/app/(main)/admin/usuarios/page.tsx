@@ -1,10 +1,19 @@
 import { getPerfilActual } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { UsuariosTable } from "@/components/admin/usuarios-table";
+import { UsuariosSinAsignar } from "@/components/admin/usuarios-sin-asignar";
 import type { PerfilUsuario, UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
+
+export interface AuthUserOrphan {
+  user_id: string;
+  email: string;
+  nombre: string;
+  created_at: string;
+}
 
 export default async function AdminUsuariosPage() {
   const perfil = await getPerfilActual();
@@ -33,14 +42,40 @@ export default async function AdminUsuariosPage() {
   const perfiles = (perfilesData ?? []) as PerfilUsuario[];
   const unidades = (unidadesData ?? []) as UnidadOrganizacional[];
 
+  // Listar usuarios de auth.users que NO tienen perfil_usuario (huérfanos)
+  let huerfanos: AuthUserOrphan[] = [];
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: authData } = await admin.auth.admin.listUsers({ perPage: 200 });
+    const conPerfil = new Set(perfiles.map((p) => p.user_id));
+    huerfanos = (authData?.users ?? [])
+      .filter((u) => !conPerfil.has(u.id))
+      .map((u) => ({
+        user_id: u.id,
+        email: u.email ?? "(sin email)",
+        nombre:
+          (u.user_metadata?.name as string) ||
+          (u.user_metadata?.full_name as string) ||
+          "",
+        created_at: u.created_at ?? "",
+      }));
+  } catch (err) {
+    console.error("No se pudieron listar usuarios huérfanos:", err);
+  }
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Administración de Usuarios</h1>
         <p className="text-sm text-muted mt-1">
           {perfiles.length} {perfiles.length === 1 ? "perfil cargado" : "perfiles cargados"}
+          {huerfanos.length > 0 && ` · ${huerfanos.length} sin asignar`}
         </p>
       </div>
+
+      {huerfanos.length > 0 && (
+        <UsuariosSinAsignar usuarios={huerfanos} unidades={unidades} />
+      )}
 
       <UsuariosTable perfiles={perfiles} unidades={unidades} rolActual={perfil.rol} />
     </div>

@@ -363,6 +363,39 @@ export async function desactivarPerfil(user_id: string) {
 }
 
 // -------------------------------------------------------
+// Server Action: Crear perfil para un usuario de auth.users existente
+// (cuando un admin creó el usuario en Supabase Dashboard y necesita
+// asignarle rol + unidad)
+// -------------------------------------------------------
+export async function crearPerfilParaUsuario(input: {
+  user_id: string;
+  email: string;
+  nombre: string;
+  rol: RolUsuario;
+  unidad_id: string | null;
+}) {
+  try {
+    await requireRol("admin_funcional", "admin_tecnico");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+  // Usar admin client para saltarse RLS (la tabla perfil_usuario tiene policies estrictas)
+  const { getSupabaseAdmin } = await import("./supabase/admin");
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from("perfil_usuario").insert({
+    user_id: input.user_id,
+    email: input.email,
+    nombre: input.nombre || null,
+    rol: input.rol,
+    unidad_id: input.unidad_id,
+    activo: true,
+  });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/usuarios");
+  return { success: true };
+}
+
+// -------------------------------------------------------
 // Server Action: Cargar/actualizar valor de un indicador
 // -------------------------------------------------------
 export async function actualizarIndicador(input: {
