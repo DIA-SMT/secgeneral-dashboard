@@ -27,9 +27,16 @@ export default async function EstructuraPage() {
     metasPorPy.set(m.proyecto_id, arr);
   }
 
+  const sortByName = (a: typeof unidades[number], b: typeof unidades[number]) =>
+    (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre);
+
   const childrenByParent: Record<string, typeof unidades> = {};
   for (const u of unidades) {
     if (u.parent_id) (childrenByParent[u.parent_id] ??= []).push(u);
+  }
+  // Ordenar alfabéticamente cada nivel
+  for (const k of Object.keys(childrenByParent)) {
+    childrenByParent[k].sort(sortByName);
   }
 
   function contarSemaforos(unidadId: string): Record<EstadoSemaforo, number> {
@@ -49,7 +56,7 @@ export default async function EstructuraPage() {
   const semaforosByUnidad: Record<string, Record<EstadoSemaforo, number>> = {};
   for (const u of unidades) semaforosByUnidad[u.id] = contarSemaforos(u.id);
 
-  const raiz = unidades.filter((u) => u.parent_id === null);
+  const raiz = unidades.filter((u) => u.parent_id === null).sort(sortByName);
 
   return (
     <div className="space-y-6 max-w-5xl">

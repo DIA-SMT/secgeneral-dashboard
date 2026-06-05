@@ -16,7 +16,6 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Panel Ejecutivo", icon: "◎" },
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
   { href: "/estructura", label: "Estructura", icon: "◈" },
-  { href: "/hitos", label: "Hitos", icon: "◆" },
   { href: "/indicadores", label: "Indicadores", icon: "◉" },
   { href: "/agenda", label: "Agenda Semanal", icon: "▤" },
   {
@@ -86,14 +85,21 @@ export function Sidebar({ rol }: { rol: RolUsuario | null }) {
       </nav>
 
       <div className="p-4 border-t border-border space-y-3">
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-4">
           <Image
             src="/logos/Direccion IA logo Secregeneral Dashboard.png"
             alt="Dirección de IA"
-            width={120}
-            height={40}
+            width={100}
+            height={32}
             className="logo-auto h-8 w-auto opacity-70"
           />
+          {/* Placeholder de Planificación Estratégica — reemplazar src cuando llegue el archivo */}
+          <div
+            title="Dirección de Planificación Estratégica"
+            className="flex items-center justify-center h-8 w-8 rounded border border-border bg-surface text-[10px] font-bold text-muted/70"
+          >
+            PE
+          </div>
         </div>
         <p className="text-[9px] text-muted/60 text-center leading-relaxed">
           <span className="font-semibold">PlanIA</span> · desarrollado por la Dirección

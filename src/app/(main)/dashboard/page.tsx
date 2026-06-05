@@ -1,4 +1,4 @@
-import { getPeriodoActivo, getResumenDashboard, getUnidades } from "@/lib/queries";
+import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadoresStats } from "@/lib/queries";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { CircularProgress } from "@/components/ui/circular-progress";
 import { SemaforoSummary } from "@/components/ui/semaforo-summary";
@@ -48,6 +48,11 @@ export default async function DashboardPage({ searchParams }: Props) {
   };
 
   const proyectosActivos = proyectosScope.filter((p) => p.estado === "activo");
+
+  // Indicadores con scope aplicado (count server-side respeta scope)
+  const indicadoresStats = scopeUnidadIds
+    ? await getIndicadoresStats(periodo.id, Array.from(scopeUnidadIds))
+    : { total: resumen.totalIndicadores, semaforo: resumen.indicadoresSemaforo };
 
   const estadoGlobal: EstadoSemaforo = !resumen.tieneSeguimiento
     ? "sin_datos"
@@ -151,10 +156,10 @@ export default async function DashboardPage({ searchParams }: Props) {
         </Link>
 
         <Link href="/indicadores" className="block hover:scale-[1.02] transition-transform">
-          <KpiCard label="Indicadores" value={resumen.totalIndicadores}
-            sublabel={resumen.totalIndicadores > 0
-              ? `${resumen.indicadoresSemaforo.verde} en verde · ${resumen.indicadoresSemaforo.rojo} en rojo`
-              : "Sin indicadores cargados"}
+          <KpiCard label="Indicadores" value={indicadoresStats.total}
+            sublabel={indicadoresStats.total > 0
+              ? `${indicadoresStats.semaforo.verde} en verde · ${indicadoresStats.semaforo.rojo} en rojo`
+              : "Sin indicadores en este ámbito"}
             accent="primary" />
         </Link>
       </div>

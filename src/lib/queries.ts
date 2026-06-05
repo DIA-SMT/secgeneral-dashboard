@@ -130,13 +130,58 @@ export async function getTodosLosHitos(periodoId: string) {
 }
 
 export async function getIndicadores(): Promise<Indicador[]> {
-  const { data, error } = await supabase
-    .from("indicador")
-    .select("*, meta:meta(*, proyecto:proyecto(id, nombre, codigo, unidad_id))")
-    .is("deleted_at", null)
-    .order("orden");
-  if (error) throw error;
-  return (data ?? []) as Indicador[];
+  // Paginar para evitar el límite default de 1000 rows
+  const all: Indicador[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("indicador")
+      .select("*, meta:meta(*, proyecto:proyecto(id, nombre, codigo, unidad_id))")
+      .is("deleted_at", null)
+      .order("orden")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as Indicador[];
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+// Devuelve totales de indicadores (count + semáforo) filtrados por periodo y
+// opcionalmente por un set de unidad_ids (scope). Se ejecuta server-side para
+// evitar el límite de 1000 rows y para que pueda respetar el scope del usuario.
+export async function getIndicadoresStats(
+  periodoId: string,
+  unidadIds?: string[] | null
+) {
+  const estados = ["verde", "amarillo", "rojo", "sin_datos"] as const;
+  const baseQuery = () => {
+    let q = supabase
+      .from("indicador")
+      .select(
+        "id, meta:meta!inner(id, proyecto:proyecto!inner(id, periodo_id, unidad_id))",
+        { count: "exact", head: true }
+      )
+      .eq("meta.proyecto.periodo_id", periodoId)
+      .is("deleted_at", null);
+    if (unidadIds && unidadIds.length > 0) {
+      q = q.in("meta.proyecto.unidad_id", unidadIds);
+    }
+    return q;
+  };
+
+  const [{ count: total }, ...porEstado] = await Promise.all([
+    baseQuery(),
+    ...estados.map((e) => baseQuery().eq("estado_semaforo", e)),
+  ]);
+  const semaforo = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
+  estados.forEach((e, i) => {
+    semaforo[e] = porEstado[i].count ?? 0;
+  });
+  return { total: total ?? 0, semaforo };
 }
 
 export async function getIndicadoresPorMeta(metaId: string): Promise<Indicador[]> {

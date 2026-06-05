@@ -1,11 +1,13 @@
 import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BackButton } from "@/components/layout/back-button";
-import type { Indicador, Meta, Proyecto } from "@/types/database";
+import { IndicadorCargaForm } from "@/components/indicadores/indicador-carga-form";
+import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
+import type { Indicador, Meta, Proyecto, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-export const revalidate = 60;
+export const revalidate = 0;
 
 export default async function IndicadorDetallePage({
   params,
@@ -23,8 +25,20 @@ export default async function IndicadorDetallePage({
 
   if (error || !data) notFound();
 
-  const ind = data as Indicador & { meta?: Meta & { proyecto?: Proyecto } };
+  const ind = data as Indicador & { meta?: Meta & { proyecto?: Proyecto & { unidad?: UnidadOrganizacional } } };
   const proyecto = ind.meta?.proyecto;
+
+  // Determinar si el usuario puede cargar este indicador
+  const perfil = await getPerfilActual();
+  let puedeCargar = false;
+  if (perfil) {
+    if (perfil.rol === "admin_funcional") {
+      puedeCargar = true;
+    } else if (perfil.rol === "director" && proyecto?.unidad_id) {
+      const scope = await getScopeUnidades(perfil);
+      puedeCargar = scope.includes(proyecto.unidad_id);
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -74,6 +88,27 @@ export default async function IndicadorDetallePage({
             <code className="block text-sm bg-border/20 p-2 rounded text-foreground">{ind.formula}</code>
           </div>
         )}
+
+        <div className="mt-6 pt-6 border-t border-border">
+          <p className="text-xs text-muted uppercase tracking-wider mb-3">Cargar avance</p>
+          {proyecto ? (
+            <IndicadorCargaForm
+              indicadorId={ind.id}
+              proyectoId={proyecto.id}
+              valorActual={ind.valor_actual}
+              valorObjetivo={ind.valor_objetivo}
+              unidadMedida={ind.unidad_medida}
+              puedeCargar={puedeCargar}
+            />
+          ) : (
+            <p className="text-xs text-muted italic">Este indicador no está vinculado a un proyecto.</p>
+          )}
+          {ind.ultima_actualizacion && (
+            <p className="text-[10px] text-muted mt-3">
+              Última actualización: {new Date(ind.ultima_actualizacion).toLocaleString("es-AR")}
+            </p>
+          )}
+        </div>
       </div>
 
       {ind.meta && (

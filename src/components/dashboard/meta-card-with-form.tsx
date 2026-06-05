@@ -108,7 +108,37 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
         </p>
       )}
 
-      {/* Formulario inline */}
+      {/* Indicadores de esta meta (siempre visibles si los hay) */}
+      {indicadores.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border/50">
+          <p className="text-[10px] text-muted uppercase tracking-wider mb-2">
+            Indicadores ({indicadores.length})
+          </p>
+          <ul className="space-y-1.5">
+            {indicadores.map((ind) => (
+              <li key={ind.id} className="flex items-center gap-2 text-xs">
+                <span className={`h-2 w-2 rounded-full shrink-0 ${
+                  ind.estado_semaforo === "verde" ? "bg-success" :
+                  ind.estado_semaforo === "amarillo" ? "bg-warning" :
+                  ind.estado_semaforo === "rojo" ? "bg-danger" : "bg-muted/40"
+                }`} />
+                <a
+                  href={`/indicadores/${ind.id}`}
+                  className="flex-1 min-w-0 line-clamp-1 text-foreground hover:text-primary transition-colors"
+                  title={ind.nombre}
+                >
+                  {ind.nombre}
+                </a>
+                <span className="text-muted shrink-0 text-[11px]">
+                  {ind.valor_actual ?? "—"}{ind.valor_objetivo != null && <> / {ind.valor_objetivo}</>}{" "}{ind.unidad_medida ?? ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Formulario inline de carga (solo cuando puede cargar y abrió el form) */}
       {showForm && (
         <div className="mt-3 space-y-3 border-t border-border pt-3">
           <AvanceForm meta={meta} proyectoId={proyectoId} onClose={() => setShowForm(false)} />

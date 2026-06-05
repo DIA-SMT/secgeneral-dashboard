@@ -128,7 +128,11 @@ export async function cargarAvance(input: CargarAvanceInput) {
       .eq("id", meta_id)
       .single();
 
-    let estado_semaforo = "sin_datos";
+    // Si la meta tiene valor_meta definido, calculamos pct. Si no (caso común
+    // tras el import inicial donde solo está el enunciado), marcamos la meta
+    // como "EN EJECUCIÓN" (amarillo) para que el dashboard refleje que hay
+    // actividad cargada aunque aún no se haya cuantificado el objetivo.
+    let estado_semaforo = "amarillo";
     if (meta && meta.valor_meta != null) {
       const base = (meta.valor_linea_base as number) ?? 0;
       const objetivo = meta.valor_meta as number;
@@ -317,7 +321,6 @@ export async function completarHito(input: {
 
   revalidatePath(`/proyectos/${proyecto_id}`);
   revalidatePath("/dashboard");
-  revalidatePath("/hitos");
   revalidatePath("/tv");
 
   return { success: true };
