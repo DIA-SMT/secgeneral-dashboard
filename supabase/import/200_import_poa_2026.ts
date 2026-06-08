@@ -106,6 +106,52 @@ async function main() {
   try {
     await db.query("BEGIN");
 
+    // ===== Paso 0: Preservar autenticación =====
+    // Guardamos el vínculo perfil_usuario.user_id <-> codigo_unidad antes
+    // de truncar unidad_organizacional. Después del import, recuperamos el
+    // user → nueva unidad_id usando el código (SEC01..07, DIR01..43) que
+    // se mantiene estable entre versiones del Excel.
+    console.log("💾 Preservando autenticación y perfiles...");
+    const perfilesBackup = await db.query<{
+      user_id: string;
+      email: string;
+      codigo_unidad: string | null;
+    }>(`
+      SELECT pu.user_id, pu.email, uo.codigo AS codigo_unidad
+      FROM perfil_usuario pu
+      LEFT JOIN unidad_organizacional uo ON uo.id = pu.unidad_id
+    `);
+    console.log(`  → ${perfilesBackup.rows.length} perfiles guardados`);
+
+    // Romper temporalmente la FK y el check constraint que exige unidad
+    // para Director/Secretario/Subsec — lo recuperamos al final del import.
+    await db.query(`
+      ALTER TABLE public.perfil_usuario
+        DROP CONSTRAINT IF EXISTS perfil_usuario_unidad_id_fkey,
+        DROP CONSTRAINT IF EXISTS chk_perfil_unidad
+    `);
+    await db.query(`
+      UPDATE perfil_usuario SET unidad_id = NULL WHERE unidad_id IS NOT NULL
+    `);
+
+    // ===== Limpiar datos del POA (sin tocar auth.users ni perfil_usuario) =====
+    console.log("🧹 Limpiando datos del POA actual...");
+    await db.query(`
+      TRUNCATE TABLE
+        public.avance,
+        public.hito,
+        public.indicador,
+        public.meta,
+        public.proyecto,
+        public.unidad_organizacional
+      RESTART IDENTITY CASCADE
+    `);
+    // Limpiar agendas porque tienen FK a unidad_organizacional
+    await db.query(
+      `TRUNCATE TABLE public.agenda_actividad, public.agenda_semana RESTART IDENTITY CASCADE`
+    );
+    console.log("  ✓ Tablas vaciadas");
+
     // ===== Paso 1: Periodo =====
     const periodoRes = await db.query<{ id: string }>(
       `SELECT id FROM periodo WHERE activo = true AND anio = 2026 LIMIT 1`
@@ -377,6 +423,65 @@ async function main() {
       );
     }
 
+    // ===== Paso 7: Re-vincular perfiles a las nuevas unidades por código =====
+    console.log("\n🔗 Re-vinculando perfiles a las nuevas unidades...");
+    let relinkados = 0;
+    let huerfanos = 0;
+    for (const perfil of perfilesBackup.rows) {
+      if (!perfil.codigo_unidad) continue;
+      // Buscar la nueva unidad con ese código
+      const codigo = perfil.codigo_unidad;
+      let nuevaId: string | undefined;
+      if (codigo.startsWith("SEC")) nuevaId = secIds.get(codigo);
+      else if (codigo.startsWith("DIR")) nuevaId = dirIds.get(codigo);
+      if (nuevaId) {
+        await db.query(
+          `UPDATE perfil_usuario SET unidad_id = $1 WHERE user_id = $2`,
+          [nuevaId, perfil.user_id]
+        );
+        relinkados++;
+      } else {
+        huerfanos++;
+        console.warn(
+          `  ⚠️  ${perfil.email} apuntaba a ${codigo} pero no existe en el nuevo Excel`
+        );
+      }
+    }
+    console.log(`  ✓ ${relinkados} perfiles re-vinculados, ${huerfanos} huérfanos`);
+
+    // ===== Desactivar perfiles huérfanos que requieren unidad =====
+    // Si un Director/Secretario/Subsecretario quedó sin unidad porque su código
+    // desapareció del Excel nuevo, lo desactivamos. Un Admin lo reasigna después.
+    const desactivadosRes = await db.query<{ email: string; rol: string }>(`
+      UPDATE perfil_usuario
+      SET activo = false
+      WHERE unidad_id IS NULL
+        AND rol IN ('director', 'subsecretario', 'secretario')
+        AND activo = true
+      RETURNING email, rol
+    `);
+    if (desactivadosRes.rows.length > 0) {
+      console.log(`  ⚠️  ${desactivadosRes.rows.length} perfiles desactivados por quedar sin unidad:`);
+      for (const r of desactivadosRes.rows) console.log(`     - ${r.email} (${r.rol})`);
+    }
+
+    // ===== Restaurar las constraints que dropeamos al principio =====
+    console.log("🔒 Restaurando constraints de perfil_usuario...");
+    await db.query(`
+      ALTER TABLE public.perfil_usuario
+        ADD CONSTRAINT perfil_usuario_unidad_id_fkey
+          FOREIGN KEY (unidad_id) REFERENCES public.unidad_organizacional(id)
+    `);
+    // Check constraint con NOT VALID para tolerar huérfanos inactivos (no se
+    // valida sobre filas existentes pero sí protege futuras inserts/updates).
+    await db.query(`
+      ALTER TABLE public.perfil_usuario
+        ADD CONSTRAINT chk_perfil_unidad CHECK (
+          (rol IN ('intendenta', 'admin_funcional', 'admin_tecnico'))
+          OR (rol IN ('secretario', 'subsecretario', 'director') AND unidad_id IS NOT NULL)
+        ) NOT VALID
+    `);
+
     await db.query("COMMIT");
 
     console.log("\n📊 RESUMEN FINAL:");
@@ -386,6 +491,7 @@ async function main() {
     console.log(`  Proyectos:      ${totalProyectos}`);
     console.log(`  Metas:          ${totalMetas}`);
     console.log(`  Indicadores:    ${totalIndicadores}`);
+    console.log(`  Perfiles:       ${relinkados} re-vinculados / ${perfilesBackup.rows.length} totales`);
     console.log("\n✅ Import completado");
   } catch (err) {
     await db.query("ROLLBACK");
