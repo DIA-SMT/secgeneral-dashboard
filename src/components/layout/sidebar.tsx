@@ -17,13 +17,8 @@ const navItems: NavItem[] = [
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
   { href: "/estructura", label: "Estructura", icon: "◈" },
   { href: "/indicadores", label: "Indicadores", icon: "◉" },
+  { href: "/avance-direcciones", label: "Avance por Dirección", icon: "📊" },
   { href: "/agenda", label: "Agenda Semanal", icon: "▤" },
-  {
-    href: "/carga",
-    label: "Cargar Avances",
-    icon: "✎",
-    roles: ["director", "admin_funcional"],
-  },
   {
     href: "/validaciones",
     label: "Validaciones",

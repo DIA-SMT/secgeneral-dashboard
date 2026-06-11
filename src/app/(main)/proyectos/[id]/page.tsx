@@ -82,10 +82,8 @@ export default async function ProyectoDetallePage({
               <p className="text-xs text-muted">Avance</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-foreground">
-                {hitos.filter((h) => h.completado).length}/{hitos.length}
-              </p>
-              <p className="text-xs text-muted">Hitos</p>
+              <p className="text-3xl font-bold text-foreground">{indicadores.length}</p>
+              <p className="text-xs text-muted">Indicadores</p>
             </div>
           </div>
         </div>
@@ -120,8 +118,8 @@ export default async function ProyectoDetallePage({
         </div>
       </div>
 
-      {/* Hitos */}
-      {hitos.length > 0 && (
+      {/* Hitos (oculto — Planif. Estratégica decidirá si vuelve) */}
+      {false && hitos.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-3">
             Hitos ({hitos.filter((h) => h.completado).length}/{hitos.length} completados)

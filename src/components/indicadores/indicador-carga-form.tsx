@@ -7,21 +7,36 @@ interface Props {
   indicadorId: string;
   proyectoId: string;
   valorActual: number | null;
+  valorActualTexto?: string | null;
   valorObjetivo: number | null;
+  valorObjetivoTexto?: string | null;
   unidadMedida: string | null;
+  observacion?: string | null;
   puedeCargar: boolean;
 }
+
+type Modo = "numerico" | "texto";
 
 export function IndicadorCargaForm({
   indicadorId,
   proyectoId,
   valorActual,
+  valorActualTexto,
   valorObjetivo,
+  valorObjetivoTexto,
   unidadMedida,
+  observacion: obsInicial,
   puedeCargar,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [valor, setValor] = useState(valorActual?.toString() ?? "");
+  const [modo, setModo] = useState<Modo>(
+    valorActualTexto != null || valorObjetivoTexto != null ? "texto" : "numerico"
+  );
+  const [valorNum, setValorNum] = useState(valorActual?.toString() ?? "");
+  const [valorTxt, setValorTxt] = useState(valorActualTexto ?? "");
+  const [unidad, setUnidad] = useState(unidadMedida ?? "");
+  const [obs, setObs] = useState(obsInicial ?? "");
+  const [estadoTexto, setEstadoTexto] = useState<"verde" | "amarillo" | "rojo">("amarillo");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -29,27 +44,52 @@ export function IndicadorCargaForm({
   const submit = () => {
     setError(null);
     setSaved(false);
-    const num = Number(valor);
-    if (!isFinite(num)) {
-      setError("Ingresá un número válido. Para porcentajes usá '45' o '45.5' (sin signo %)");
-      return;
-    }
-    startTransition(async () => {
-      const r = await actualizarIndicador({
-        indicador_id: indicadorId,
-        valor_actual: num,
-        proyecto_id: proyectoId,
-      });
-      if (r.success) {
-        setSaved(true);
-        setTimeout(() => {
-          setSaved(false);
-          setOpen(false);
-        }, 1200);
-      } else {
-        setError(r.error ?? "Error al guardar");
+
+    if (modo === "numerico") {
+      const num = Number(valorNum);
+      if (!isFinite(num)) {
+        setError("Ingresá un número válido (sin signo %).");
+        return;
       }
-    });
+      startTransition(async () => {
+        const r = await actualizarIndicador({
+          indicador_id: indicadorId,
+          valor_actual: num,
+          valor_actual_texto: null,
+          unidad_medida: unidad || null,
+          observacion: obs || null,
+          proyecto_id: proyectoId,
+        });
+        if (r.success) {
+          setSaved(true);
+          setTimeout(() => setOpen(false), 1000);
+        } else {
+          setError(r.error ?? "Error");
+        }
+      });
+    } else {
+      if (!valorTxt.trim()) {
+        setError("Ingresá un valor (ej. Sí, No, Realizado).");
+        return;
+      }
+      startTransition(async () => {
+        const r = await actualizarIndicador({
+          indicador_id: indicadorId,
+          valor_actual: null,
+          valor_actual_texto: valorTxt.trim(),
+          unidad_medida: unidad || null,
+          observacion: obs || null,
+          estado_semaforo_override: estadoTexto,
+          proyecto_id: proyectoId,
+        });
+        if (r.success) {
+          setSaved(true);
+          setTimeout(() => setOpen(false), 1000);
+        } else {
+          setError(r.error ?? "Error");
+        }
+      });
+    }
   };
 
   if (!puedeCargar) {
@@ -73,31 +113,143 @@ export function IndicadorCargaForm({
 
   return (
     <div className="space-y-3 p-4 bg-background border border-border rounded-lg">
+      {/* Tipo de valor */}
       <div>
-        <label className="text-xs text-muted uppercase tracking-wider">
-          Nuevo valor {unidadMedida && <span>({unidadMedida})</span>}
-        </label>
-        <input
-          type="number"
-          step="any"
-          value={valor}
-          onChange={(e) => setValor(e.target.value)}
-          autoFocus
-          placeholder={valorObjetivo != null ? `Objetivo: ${valorObjetivo}` : "Ingresá un valor"}
+        <p className="text-xs text-muted uppercase tracking-wider mb-1.5">Tipo de valor</p>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => setModo("numerico")}
+            className={`text-xs px-3 py-1 rounded border ${
+              modo === "numerico"
+                ? "bg-primary/20 text-primary border-primary/30"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            🔢 Numérico
+          </button>
+          <button
+            type="button"
+            onClick={() => setModo("texto")}
+            className={`text-xs px-3 py-1 rounded border ${
+              modo === "texto"
+                ? "bg-primary/20 text-primary border-primary/30"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            🔤 Texto (Sí/No, Realizado)
+          </button>
+        </div>
+      </div>
+
+      {/* Valor */}
+      {modo === "numerico" ? (
+        <div>
+          <label className="text-xs text-muted uppercase tracking-wider">
+            Valor actual {unidad && <span>({unidad})</span>}
+          </label>
+          <input
+            type="number"
+            step="any"
+            value={valorNum}
+            onChange={(e) => setValorNum(e.target.value)}
+            autoFocus
+            placeholder={valorObjetivo != null ? `Objetivo: ${valorObjetivo}` : "Ej: 45"}
+            className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
+          />
+          <p className="text-[10px] text-muted mt-1">
+            Para porcentajes ingresá el número sin el signo % (ej. 45 = 45%).
+          </p>
+        </div>
+      ) : (
+        <>
+          <div>
+            <label className="text-xs text-muted uppercase tracking-wider">Valor actual (texto)</label>
+            <input
+              type="text"
+              value={valorTxt}
+              onChange={(e) => setValorTxt(e.target.value)}
+              autoFocus
+              placeholder='Ej: "Sí", "No", "Realizado", "En curso"'
+              className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted uppercase tracking-wider">Estado del avance</label>
+            <div className="flex gap-1 mt-1">
+              <button
+                type="button"
+                onClick={() => setEstadoTexto("verde")}
+                className={`text-xs px-3 py-1 rounded border ${
+                  estadoTexto === "verde"
+                    ? "bg-success/20 text-success border-success/30"
+                    : "border-border text-muted"
+                }`}
+              >
+                🟢 Finalizado
+              </button>
+              <button
+                type="button"
+                onClick={() => setEstadoTexto("amarillo")}
+                className={`text-xs px-3 py-1 rounded border ${
+                  estadoTexto === "amarillo"
+                    ? "bg-warning/20 text-warning border-warning/30"
+                    : "border-border text-muted"
+                }`}
+              >
+                🟡 En ejecución
+              </button>
+              <button
+                type="button"
+                onClick={() => setEstadoTexto("rojo")}
+                className={`text-xs px-3 py-1 rounded border ${
+                  estadoTexto === "rojo"
+                    ? "bg-danger/20 text-danger border-danger/30"
+                    : "border-border text-muted"
+                }`}
+              >
+                🔴 No iniciado
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Unidad de medida (solo numérico) */}
+      {modo === "numerico" && (
+        <div>
+          <label className="text-xs text-muted uppercase tracking-wider">
+            Unidad de medida (opcional)
+          </label>
+          <input
+            type="text"
+            value={unidad}
+            onChange={(e) => setUnidad(e.target.value)}
+            placeholder="Ej: %, días, personas, atenciones, capacitaciones"
+            className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
+          />
+        </div>
+      )}
+
+      {/* Observación */}
+      <div>
+        <label className="text-xs text-muted uppercase tracking-wider">Observación (opcional)</label>
+        <textarea
+          value={obs}
+          onChange={(e) => setObs(e.target.value)}
+          rows={2}
+          placeholder="Nota sobre el avance reportado..."
           className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
         />
-        <p className="text-[10px] text-muted mt-1">
-          Para porcentajes ingresá el número sin signo (ej. 45 = 45%).
-        </p>
       </div>
 
       {error && <p className="text-xs text-danger">{error}</p>}
       {saved && <p className="text-xs text-success">✓ Guardado correctamente</p>}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 pt-1">
         <button
           onClick={submit}
-          disabled={isPending || !valor}
+          disabled={isPending}
           className="text-sm bg-primary text-white rounded px-4 py-1.5 hover:bg-primary/90 disabled:opacity-50"
         >
           {isPending ? "Guardando..." : "Guardar"}

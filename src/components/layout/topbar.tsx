@@ -16,12 +16,6 @@ const navItems: NavItem[] = [
   { href: "/agenda", label: "Agenda", icon: "▤" },
   { href: "/estructura", label: "Estructura", icon: "◈" },
   {
-    href: "/carga",
-    label: "Cargar",
-    icon: "✎",
-    roles: ["director", "admin_funcional"],
-  },
-  {
     href: "/validaciones",
     label: "Validar",
     icon: "✓",

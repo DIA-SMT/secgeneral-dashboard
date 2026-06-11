@@ -169,7 +169,10 @@ export interface Indicador {
   formula: string | null;
   unidad_medida: string | null;
   valor_actual: number | null;
+  valor_actual_texto: string | null;
   valor_objetivo: number | null;
+  valor_objetivo_texto: string | null;
+  observacion: string | null;
   estado_semaforo: EstadoSemaforo;
   ultima_actualizacion: string | null;
   orden: number;

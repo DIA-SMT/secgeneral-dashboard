@@ -29,10 +29,10 @@ export function IndicadoresFiltros({ unidades }: { unidades: UnidadOrganizaciona
 
   const estados = [
     { value: "todos", label: "Todos" },
-    { value: "verde", label: "Verde" },
-    { value: "amarillo", label: "Amarillo" },
-    { value: "rojo", label: "Rojo" },
-    { value: "sin_datos", label: "Sin datos" },
+    { value: "verde", label: "🟢 Verde — Finalizado" },
+    { value: "amarillo", label: "🟡 Amarillo — En ejecución" },
+    { value: "rojo", label: "🔴 Rojo — No iniciado" },
+    { value: "sin_datos", label: "⚪ Sin datos" },
   ];
 
   return (

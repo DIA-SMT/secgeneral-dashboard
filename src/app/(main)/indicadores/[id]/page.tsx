@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BackButton } from "@/components/layout/back-button";
 import { IndicadorCargaForm } from "@/components/indicadores/indicador-carga-form";
+import { IndicadorAccionesBar } from "@/components/indicadores/indicador-acciones-bar";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import type { Indicador, Meta, Proyecto, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
@@ -28,7 +29,6 @@ export default async function IndicadorDetallePage({
   const ind = data as Indicador & { meta?: Meta & { proyecto?: Proyecto & { unidad?: UnidadOrganizacional } } };
   const proyecto = ind.meta?.proyecto;
 
-  // Determinar si el usuario puede cargar este indicador
   const perfil = await getPerfilActual();
   let puedeCargar = false;
   if (perfil) {
@@ -39,6 +39,21 @@ export default async function IndicadorDetallePage({
       puedeCargar = scope.includes(proyecto.unidad_id);
     }
   }
+
+  // Valores a mostrar (textual gana sobre numérico cuando ambos existen)
+  const valorActualDisplay =
+    ind.valor_actual_texto && ind.valor_actual_texto.trim() !== ""
+      ? ind.valor_actual_texto
+      : ind.valor_actual != null
+      ? `${ind.valor_actual}${ind.unidad_medida ? ` ${ind.unidad_medida}` : ""}`
+      : "—";
+
+  const valorObjetivoDisplay =
+    ind.valor_objetivo_texto && ind.valor_objetivo_texto.trim() !== ""
+      ? ind.valor_objetivo_texto
+      : ind.valor_objetivo != null
+      ? `${ind.valor_objetivo}${ind.unidad_medida ? ` ${ind.unidad_medida}` : ""}`
+      : "—";
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -70,17 +85,24 @@ export default async function IndicadorDetallePage({
         <div className="grid grid-cols-2 gap-4 mt-6">
           <div className="rounded-lg bg-border/20 p-4">
             <p className="text-xs text-muted uppercase tracking-wider">Valor actual</p>
-            <p className="text-2xl font-bold text-foreground mt-1">
-              {ind.valor_actual ?? "—"} <span className="text-sm text-muted">{ind.unidad_medida ?? ""}</span>
+            <p className="text-2xl font-bold text-foreground mt-1 break-words">
+              {valorActualDisplay}
             </p>
           </div>
           <div className="rounded-lg bg-border/20 p-4">
             <p className="text-xs text-muted uppercase tracking-wider">Objetivo</p>
-            <p className="text-2xl font-bold text-foreground mt-1">
-              {ind.valor_objetivo ?? "—"} <span className="text-sm text-muted">{ind.unidad_medida ?? ""}</span>
+            <p className="text-2xl font-bold text-foreground mt-1 break-words">
+              {valorObjetivoDisplay}
             </p>
           </div>
         </div>
+
+        {ind.observacion && (
+          <div className="mt-4 rounded-lg bg-accent/5 border border-accent/20 p-3">
+            <p className="text-[10px] text-accent uppercase tracking-wider mb-1">Última observación</p>
+            <p className="text-xs text-foreground">{ind.observacion}</p>
+          </div>
+        )}
 
         {ind.formula && (
           <div className="mt-4">
@@ -90,14 +112,17 @@ export default async function IndicadorDetallePage({
         )}
 
         <div className="mt-6 pt-6 border-t border-border">
-          <p className="text-xs text-muted uppercase tracking-wider mb-3">Cargar avance</p>
+          <p className="text-xs text-muted uppercase tracking-wider mb-3">Cargar / actualizar avance</p>
           {proyecto ? (
             <IndicadorCargaForm
               indicadorId={ind.id}
               proyectoId={proyecto.id}
               valorActual={ind.valor_actual}
+              valorActualTexto={ind.valor_actual_texto}
               valorObjetivo={ind.valor_objetivo}
+              valorObjetivoTexto={ind.valor_objetivo_texto}
               unidadMedida={ind.unidad_medida}
+              observacion={ind.observacion}
               puedeCargar={puedeCargar}
             />
           ) : (
@@ -108,6 +133,22 @@ export default async function IndicadorDetallePage({
               Última actualización: {new Date(ind.ultima_actualizacion).toLocaleString("es-AR")}
             </p>
           )}
+
+          {/* Acciones avanzadas: corregir/borrar/editar metadata */}
+          {puedeCargar && proyecto && (
+            <IndicadorAccionesBar
+              indicadorId={ind.id}
+              proyectoId={proyecto.id}
+              nombre={ind.nombre}
+              unidadMedida={ind.unidad_medida}
+              valorObjetivo={ind.valor_objetivo}
+              valorObjetivoTexto={ind.valor_objetivo_texto}
+              tieneValor={
+                ind.valor_actual != null ||
+                (ind.valor_actual_texto != null && ind.valor_actual_texto.trim() !== "")
+              }
+            />
+          )}
         </div>
       </div>
 
@@ -115,6 +156,11 @@ export default async function IndicadorDetallePage({
         <div className="rounded-xl border border-border bg-surface p-5">
           <p className="text-xs text-muted uppercase tracking-wider mb-2">Meta vinculada</p>
           <h3 className="text-sm font-semibold text-foreground">{ind.meta.nombre}</h3>
+          {ind.meta.valor_meta != null && (
+            <p className="text-xs text-muted mt-1">
+              Valor de la meta: <span className="text-foreground font-semibold">{ind.meta.valor_meta} {ind.meta.unidad_medida ?? ""}</span>
+            </p>
+          )}
           {proyecto && (
             <Link
               href={`/proyectos/${proyecto.id}`}

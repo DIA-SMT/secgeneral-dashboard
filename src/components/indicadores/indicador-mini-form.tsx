@@ -8,9 +8,19 @@ interface Props {
   metaId: string;
   proyectoId: string;
   indicadores: Indicador[];
+  metaValorMeta?: number | null;
+  metaUnidadMedida?: string | null;
+  puedeEditar?: boolean;
 }
 
-export function IndicadoresPanel({ metaId, proyectoId, indicadores }: Props) {
+export function IndicadoresPanel({
+  metaId,
+  proyectoId,
+  indicadores,
+  metaValorMeta,
+  metaUnidadMedida,
+  puedeEditar = false,
+}: Props) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -19,16 +29,20 @@ export function IndicadoresPanel({ metaId, proyectoId, indicadores }: Props) {
     <div className="space-y-2 mt-3">
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-muted uppercase tracking-wider">Indicadores ({indicadores.length})</p>
-        <button
-          onClick={() => setAdding(!adding)}
-          className="text-[10px] text-primary hover:text-primary-light"
-        >
-          {adding ? "Cancelar" : "+ Agregar"}
-        </button>
+        {puedeEditar && (
+          <button
+            onClick={() => setAdding(!adding)}
+            className="text-[10px] text-primary hover:text-primary-light"
+          >
+            {adding ? "Cancelar" : "+ Agregar"}
+          </button>
+        )}
       </div>
 
-      {adding && (
+      {adding && puedeEditar && (
         <CreateForm
+          metaValorMeta={metaValorMeta}
+          metaUnidadMedida={metaUnidadMedida}
           onSubmit={(data) => {
             startTransition(async () => {
               await crearIndicador({ ...data, meta_id: metaId, proyecto_id: proyectoId });
@@ -87,13 +101,17 @@ export function IndicadoresPanel({ metaId, proyectoId, indicadores }: Props) {
 function CreateForm({
   onSubmit,
   isPending,
+  metaValorMeta,
+  metaUnidadMedida,
 }: {
   onSubmit: (data: { nombre: string; unidad_medida?: string | null; valor_objetivo?: number | null }) => void;
   isPending: boolean;
+  metaValorMeta?: number | null;
+  metaUnidadMedida?: string | null;
 }) {
   const [nombre, setNombre] = useState("");
-  const [unidad, setUnidad] = useState("");
-  const [objetivo, setObjetivo] = useState("");
+  const [unidad, setUnidad] = useState(metaUnidadMedida ?? "");
+  const [objetivo, setObjetivo] = useState(metaValorMeta?.toString() ?? "");
 
   return (
     <form

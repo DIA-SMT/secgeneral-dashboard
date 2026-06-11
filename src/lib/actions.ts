@@ -403,10 +403,22 @@ export async function crearPerfilParaUsuario(input: {
 // -------------------------------------------------------
 export async function actualizarIndicador(input: {
   indicador_id: string;
-  valor_actual: number | null;
+  valor_actual?: number | null;
+  valor_actual_texto?: string | null;
+  unidad_medida?: string | null;
+  observacion?: string | null;
+  estado_semaforo_override?: "verde" | "amarillo" | "rojo" | "sin_datos" | null;
   proyecto_id?: string;
 }) {
-  const { indicador_id, valor_actual, proyecto_id } = input;
+  const {
+    indicador_id,
+    valor_actual,
+    valor_actual_texto,
+    unidad_medida,
+    observacion,
+    estado_semaforo_override,
+    proyecto_id,
+  } = input;
 
   const { data: ind } = await supabase
     .from("indicador")
@@ -415,24 +427,148 @@ export async function actualizarIndicador(input: {
     .single();
 
   const invertida = (ind?.metadata as Record<string, unknown> | undefined)?.invertida === true;
-  const estado = calcularSemaforo(valor_actual, ind?.valor_objetivo ?? null, 0, invertida);
+
+  // Si el usuario eligió un estado manualmente (caso texto), respetarlo.
+  // Sino, calcular del valor numérico cuando exista.
+  let estado: string;
+  if (estado_semaforo_override) {
+    estado = estado_semaforo_override;
+  } else if (valor_actual != null) {
+    estado = calcularSemaforo(valor_actual, ind?.valor_objetivo ?? null, 0, invertida);
+  } else if (valor_actual_texto != null && valor_actual_texto.trim() !== "") {
+    // Hay texto sin override → considerar "en ejecución" (avance reportado pero sin score numérico)
+    estado = "amarillo";
+  } else {
+    estado = "sin_datos";
+  }
+
+  type UpdatePayload = {
+    valor_actual?: number | null;
+    valor_actual_texto?: string | null;
+    unidad_medida?: string | null;
+    observacion?: string | null;
+    estado_semaforo: string;
+    ultima_actualizacion: string;
+  };
+  const update: UpdatePayload = {
+    estado_semaforo: estado,
+    ultima_actualizacion: new Date().toISOString(),
+  };
+  if (valor_actual !== undefined) update.valor_actual = valor_actual;
+  if (valor_actual_texto !== undefined) update.valor_actual_texto = valor_actual_texto;
+  if (unidad_medida !== undefined) update.unidad_medida = unidad_medida;
+  if (observacion !== undefined) update.observacion = observacion;
 
   const { error } = await supabase
     .from("indicador")
-    .update({
-      valor_actual,
-      estado_semaforo: estado,
-      ultima_actualizacion: new Date().toISOString(),
-    })
+    .update(update)
     .eq("id", indicador_id);
 
   if (error) return { success: false, error: error.message };
 
   if (proyecto_id) revalidatePath(`/proyectos/${proyecto_id}`);
+  revalidatePath("/proyectos");
   revalidatePath("/indicadores");
   revalidatePath(`/indicadores/${indicador_id}`);
   revalidatePath("/dashboard");
+  revalidatePath("/tv");
 
+  return { success: true };
+}
+
+// -------------------------------------------------------
+// Server Action: Borrar el valor cargado en un indicador
+// (vuelve a estado inicial sin avance)
+// -------------------------------------------------------
+export async function borrarValorIndicador(input: {
+  indicador_id: string;
+  proyecto_id?: string;
+}) {
+  try {
+    await requireRol("director", "admin_funcional");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+  const { error } = await supabase
+    .from("indicador")
+    .update({
+      valor_actual: null,
+      valor_actual_texto: null,
+      observacion: null,
+      estado_semaforo: "sin_datos",
+      ultima_actualizacion: null,
+    })
+    .eq("id", input.indicador_id);
+  if (error) return { success: false, error: error.message };
+  if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/proyectos");
+  revalidatePath("/indicadores");
+  revalidatePath(`/indicadores/${input.indicador_id}`);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+// -------------------------------------------------------
+// Server Action: Editar metadata de un indicador (nombre, unidad, objetivo)
+// -------------------------------------------------------
+export async function editarIndicador(input: {
+  indicador_id: string;
+  nombre?: string;
+  unidad_medida?: string | null;
+  valor_objetivo?: number | null;
+  valor_objetivo_texto?: string | null;
+  proyecto_id?: string;
+}) {
+  try {
+    await requireRol("director", "admin_funcional");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+  type UpdatePayload = {
+    nombre?: string;
+    unidad_medida?: string | null;
+    valor_objetivo?: number | null;
+    valor_objetivo_texto?: string | null;
+  };
+  const update: UpdatePayload = {};
+  if (input.nombre !== undefined) update.nombre = input.nombre;
+  if (input.unidad_medida !== undefined) update.unidad_medida = input.unidad_medida;
+  if (input.valor_objetivo !== undefined) update.valor_objetivo = input.valor_objetivo;
+  if (input.valor_objetivo_texto !== undefined) update.valor_objetivo_texto = input.valor_objetivo_texto;
+
+  const { error } = await supabase
+    .from("indicador")
+    .update(update)
+    .eq("id", input.indicador_id);
+  if (error) return { success: false, error: error.message };
+  if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/proyectos");
+  revalidatePath("/indicadores");
+  revalidatePath(`/indicadores/${input.indicador_id}`);
+  return { success: true };
+}
+
+// -------------------------------------------------------
+// Server Action: Borrar (soft-delete) un indicador completo
+// -------------------------------------------------------
+export async function eliminarIndicador(input: {
+  indicador_id: string;
+  proyecto_id?: string;
+}) {
+  try {
+    await requireRol("director", "admin_funcional");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+  const { error } = await supabase
+    .from("indicador")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", input.indicador_id);
+  if (error) return { success: false, error: error.message };
+  if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/proyectos");
+  revalidatePath("/indicadores");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -446,6 +582,11 @@ export async function crearIndicador(input: {
   valor_objetivo?: number | null;
   proyecto_id?: string;
 }) {
+  try {
+    await requireRol("director", "admin_funcional");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
   const { error } = await supabase.from("indicador").insert({
     meta_id: input.meta_id,
     nombre: input.nombre,
