@@ -28,41 +28,23 @@ export default async function Poa2027Landing() {
         </p>
       </div>
 
-      {/* Documentos de referencia */}
+      {/* Documento de referencia */}
       <section>
         <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
-          📄 Documentos de referencia
+          📄 Documento de referencia
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <a
-            href="/poa2027/ficha-prisma.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors flex items-center gap-3"
-          >
-            <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center text-lg">📋</div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Ficha PRISMA (modelo)</p>
-              <p className="text-[10px] text-muted">Descargar plantilla en blanco</p>
-            </div>
-          </a>
-          <a
-            href="/poa2027/instructivo-prisma.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors flex items-center gap-3"
-          >
-            <div className="h-10 w-10 rounded-lg bg-accent/20 flex items-center justify-center text-lg">📖</div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Instructivo de carga</p>
-              <p className="text-[10px] text-muted">Cómo completar la ficha PRISMA</p>
-            </div>
-          </a>
-        </div>
-        <p className="text-[10px] text-muted mt-2">
-          Si los documentos no abren, todavía no fueron subidos al servidor. Avisá a la Dirección de
-          Planificación Estratégica.
-        </p>
+        <a
+          href="/poa2027/ficha-prisma.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors flex items-center gap-3 max-w-md"
+        >
+          <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center text-lg">📋</div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Ficha PRISMA + Instructivo</p>
+            <p className="text-[10px] text-muted">Modelo de la ficha y guía de cómo completarla</p>
+          </div>
+        </a>
       </section>
 
       {/* Acciones del director */}
