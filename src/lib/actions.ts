@@ -3,7 +3,7 @@
 import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "./supabase/server";
-import { requireValidacionSobreUnidad, requireRol } from "./auth";
+import { requireValidacionSobreUnidad, requireRol, getPerfilActual } from "./auth";
 import type { RolUsuario } from "@/types/database";
 
 // -------------------------------------------------------
@@ -692,5 +692,100 @@ export async function corregirAvance(input: {
   revalidatePath("/dashboard");
   revalidatePath("/tv");
 
+  return { success: true };
+}
+
+// -------------------------------------------------------
+// Server Actions: Fichas PRISMA (POA 2027)
+// -------------------------------------------------------
+
+interface FichaPrismaInput {
+  codigo?: string | null;
+  programa: string;
+  relevancia?: string | null;
+  indicador?: string | null;
+  secretaria?: string | null;
+  meta_anual?: string | null;
+  ancla?: string | null;
+}
+
+export async function crearFichaPrisma(input: FichaPrismaInput) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+    return { success: false, error: "Solo los Directores pueden cargar fichas PRISMA" };
+  }
+  if (!perfil.unidad_id && perfil.rol === "director") {
+    return { success: false, error: "Tu perfil no tiene una dirección asignada" };
+  }
+  if (!input.programa?.trim()) {
+    return { success: false, error: "El campo Programa/Proyecto es obligatorio" };
+  }
+
+  const { error } = await supabase.from("ficha_prisma").insert({
+    unidad_id: perfil.unidad_id,
+    anio: 2027,
+    codigo: input.codigo ?? null,
+    programa: input.programa.trim(),
+    relevancia: input.relevancia ?? null,
+    indicador: input.indicador ?? null,
+    secretaria: input.secretaria ?? null,
+    meta_anual: input.meta_anual ?? null,
+    ancla: input.ancla ?? null,
+    created_by: perfil.user_id,
+  });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/poa-2027/mis-fichas");
+  revalidatePath("/poa-2027");
+  return { success: true };
+}
+
+export async function editarFichaPrisma(id: string, input: FichaPrismaInput) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  if (!input.programa?.trim()) {
+    return { success: false, error: "El campo Programa/Proyecto es obligatorio" };
+  }
+
+  // Verificar pertenencia: el director solo edita fichas de su unidad
+  const { data: ficha } = await supabase
+    .from("ficha_prisma")
+    .select("unidad_id")
+    .eq("id", id)
+    .single();
+  if (!ficha) return { success: false, error: "Ficha no encontrada" };
+  if (
+    perfil.rol === "director" &&
+    (ficha as { unidad_id: string }).unidad_id !== perfil.unidad_id
+  ) {
+    return { success: false, error: "No podés editar fichas de otra dirección" };
+  }
+
+  const { error } = await supabase
+    .from("ficha_prisma")
+    .update({
+      codigo: input.codigo ?? null,
+      programa: input.programa.trim(),
+      relevancia: input.relevancia ?? null,
+      indicador: input.indicador ?? null,
+      secretaria: input.secretaria ?? null,
+      meta_anual: input.meta_anual ?? null,
+      ancla: input.ancla ?? null,
+    })
+    .eq("id", id);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/poa-2027/mis-fichas");
+  return { success: true };
+}
+
+export async function eliminarFichaPrisma(id: string) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  const { error } = await supabase
+    .from("ficha_prisma")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/poa-2027/mis-fichas");
   return { success: true };
 }

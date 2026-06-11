@@ -14,6 +14,7 @@ const navItems: NavItem[] = [
   { href: "/proyectos", label: "Proyectos", icon: "▦" },
   { href: "/indicadores", label: "Indicadores", icon: "◉" },
   { href: "/agenda", label: "Agenda", icon: "▤" },
+  { href: "/poa-2027", label: "POA 2027", icon: "◆" },
   { href: "/estructura", label: "Estructura", icon: "◈" },
   {
     href: "/validaciones",

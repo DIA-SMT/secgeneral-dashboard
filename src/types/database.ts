@@ -210,6 +210,25 @@ export interface AgendaActividad {
   created_at: string;
 }
 
+export interface FichaPrisma {
+  id: string;
+  unidad_id: string;
+  anio: number;
+  codigo: string | null;
+  programa: string;       // P
+  relevancia: string | null;  // R
+  indicador: string | null;   // I
+  secretaria: string | null;  // S
+  meta_anual: string | null;  // M
+  ancla: string | null;       // A
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  // Joined
+  unidad?: UnidadOrganizacional;
+}
+
 type TableDefinition<RowType> = {
   Row: RowType;
   Insert: Partial<RowType>;
@@ -231,6 +250,7 @@ export interface Database {
       agenda_semana: TableDefinition<AgendaSemana>;
       agenda_actividad: TableDefinition<AgendaActividad>;
       perfil_usuario: TableDefinition<PerfilUsuario>;
+      ficha_prisma: TableDefinition<FichaPrisma>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

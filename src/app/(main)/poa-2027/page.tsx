@@ -1,0 +1,135 @@
+import { getPerfilActual } from "@/lib/auth";
+import { getSupabaseServer } from "@/lib/supabase/server";
+import Link from "next/link";
+
+export const revalidate = 0;
+
+export default async function Poa2027Landing() {
+  const perfil = await getPerfilActual();
+  let cantidadFichas = 0;
+  if (perfil?.unidad_id) {
+    const sb = await getSupabaseServer();
+    const { count } = await sb
+      .from("ficha_prisma")
+      .select("*", { count: "exact", head: true })
+      .eq("unidad_id", perfil.unidad_id)
+      .is("deleted_at", null);
+    cantidadFichas = count ?? 0;
+  }
+
+  const esDirector = perfil?.rol === "director" || perfil?.rol === "admin_funcional";
+
+  return (
+    <div className="space-y-8 max-w-4xl">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">POA 2027 — Ficha PRISMA</h1>
+        <p className="text-sm text-muted mt-1">
+          Planificación de proyectos para el Plan Operativo Anual 2027 mediante la metodología PRISMA.
+        </p>
+      </div>
+
+      {/* Documentos de referencia */}
+      <section>
+        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
+          📄 Documentos de referencia
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a
+            href="/poa2027/ficha-prisma.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors flex items-center gap-3"
+          >
+            <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center text-lg">📋</div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Ficha PRISMA (modelo)</p>
+              <p className="text-[10px] text-muted">Descargar plantilla en blanco</p>
+            </div>
+          </a>
+          <a
+            href="/poa2027/instructivo-prisma.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-xl border border-border bg-surface p-4 hover:border-primary/40 transition-colors flex items-center gap-3"
+          >
+            <div className="h-10 w-10 rounded-lg bg-accent/20 flex items-center justify-center text-lg">📖</div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Instructivo de carga</p>
+              <p className="text-[10px] text-muted">Cómo completar la ficha PRISMA</p>
+            </div>
+          </a>
+        </div>
+        <p className="text-[10px] text-muted mt-2">
+          Si los documentos no abren, todavía no fueron subidos al servidor. Avisá a la Dirección de
+          Planificación Estratégica.
+        </p>
+      </section>
+
+      {/* Acciones del director */}
+      {esDirector ? (
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link
+            href="/poa-2027/cargar"
+            className="rounded-xl border border-primary/30 bg-primary/5 p-5 hover:bg-primary/10 transition-colors text-center"
+          >
+            <div className="text-2xl mb-2">➕</div>
+            <p className="text-sm font-semibold text-foreground">Cargar ficha nueva</p>
+            <p className="text-[10px] text-muted mt-1">Crear una ficha PRISMA</p>
+          </Link>
+          <Link
+            href="/poa-2027/mis-fichas"
+            className="rounded-xl border border-border bg-surface p-5 hover:border-primary/40 transition-colors text-center"
+          >
+            <div className="text-2xl mb-2">📑</div>
+            <p className="text-sm font-semibold text-foreground">Mis fichas</p>
+            <p className="text-[10px] text-muted mt-1">
+              {cantidadFichas} {cantidadFichas === 1 ? "ficha cargada" : "fichas cargadas"} · ver y editar
+            </p>
+          </Link>
+          <Link
+            href="/poa-2027/exportar"
+            className="rounded-xl border border-border bg-surface p-5 hover:border-primary/40 transition-colors text-center"
+          >
+            <div className="text-2xl mb-2">📥</div>
+            <p className="text-sm font-semibold text-foreground">Generar POA 2027</p>
+            <p className="text-[10px] text-muted mt-1">Documento editable con todas tus fichas</p>
+          </Link>
+        </section>
+      ) : (
+        <div className="rounded-xl border border-border bg-surface p-6 text-center">
+          <p className="text-sm text-muted">
+            La carga de fichas PRISMA está disponible para los Directores. Con tu rol actual podés ver
+            los documentos de referencia.
+          </p>
+        </div>
+      )}
+
+      {/* Estructura PRISMA explicada */}
+      <section>
+        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
+          ¿Qué es PRISMA?
+        </h2>
+        <div className="rounded-xl border border-border bg-surface divide-y divide-border">
+          {[
+            ["P", "Programa / Proyecto", "Nombre del programa o proyecto planificado."],
+            ["R", "Relevancia", "Descripción y objetivo: por qué es importante."],
+            ["I", "Indicador", "Cómo se mide el avance o cumplimiento."],
+            ["S", "Secretaría", "Secretaría a la que pertenece."],
+            ["M", "Meta anual", "Meta concreta a alcanzar en 2027."],
+            ["A", "Ancla (línea de base)", "Punto de partida / valor de referencia actual."],
+          ].map(([letra, titulo, desc]) => (
+            <div key={letra} className="flex items-center gap-3 p-3">
+              <span className="h-8 w-8 rounded bg-primary/20 text-primary flex items-center justify-center text-sm font-bold shrink-0">
+                {letra}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{titulo}</p>
+                <p className="text-[11px] text-muted">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
