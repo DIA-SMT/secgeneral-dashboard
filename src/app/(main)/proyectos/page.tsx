@@ -1,7 +1,7 @@
 import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { calcularEstadoProyecto } from "@/lib/utils";
+import { calcularAvancePorIndicadores } from "@/lib/utils";
 import type { Meta, UnidadOrganizacional, Indicador } from "@/types/database";
 import { ProyectosSearch } from "./search";
 import { PoaTree, type PoaIndicador, type PoaMeta, type PoaProyecto } from "@/components/poa/poa-tree";
@@ -73,7 +73,8 @@ export default async function ProyectosPage({ searchParams }: Props) {
   if (params.estado && params.estado !== "todos") {
     proyectosFiltrados = proyectosFiltrados.filter((p) => {
       const metas = metasPorPy.get(p.id) ?? [];
-      const { estado } = calcularEstadoProyecto(metas);
+      const inds = metas.flatMap((m) => indPorMeta.get(m.id) ?? []);
+      const { estado } = calcularAvancePorIndicadores(inds);
       return estado === params.estado;
     });
   }
@@ -111,9 +112,9 @@ export default async function ProyectosPage({ searchParams }: Props) {
             estado_semaforo: i.estado_semaforo,
           })),
         }));
-        const { porcentaje, estado, tieneSeguimiento } = calcularEstadoProyecto(
-          metas as unknown as Meta[]
-        );
+        // Avance del proyecto basado en SUS indicadores
+        const todosIndPy = metas.flatMap((m) => m.indicadores);
+        const avInd = calcularAvancePorIndicadores(todosIndPy);
         result.push({
           id: py.id,
           codigo: py.codigo,
@@ -121,9 +122,9 @@ export default async function ProyectosPage({ searchParams }: Props) {
           unidad_id: py.unidad_id,
           unidad_nombre: unidadById.get(py.unidad_id)?.nombre_corto ?? unidadById.get(py.unidad_id)?.nombre ?? null,
           metas,
-          porcentaje: porcentaje ?? 0,
-          estado,
-          tieneSeguimiento,
+          porcentaje: avInd.porcentaje ?? 0,
+          estado: avInd.estado,
+          tieneSeguimiento: avInd.conDatos > 0,
           puedeCargar: !!scopeUnidadesUsuario && scopeUnidadesUsuario.has(py.unidad_id),
         });
       }

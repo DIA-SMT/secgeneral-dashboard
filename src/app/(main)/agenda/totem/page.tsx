@@ -2,7 +2,7 @@ import { getUnidades, getAgendasSemana, lunesDeSemana } from "@/lib/queries";
 import { TotemRotator } from "@/components/agenda/totem-rotator";
 import type { AgendaSemana, AgendaActividad } from "@/types/database";
 
-export const revalidate = 60;
+export const revalidate = 0;
 
 interface Props {
   searchParams: Promise<{ subsec?: string; semana?: string }>;

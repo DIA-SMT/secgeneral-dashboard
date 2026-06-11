@@ -150,3 +150,41 @@ export function calcularEstadoProyecto(metas: {
 
   return { porcentaje: avg, estado, tieneSeguimiento };
 }
+
+// Calcula el grado de avance de un proyecto a partir de SUS INDICADORES.
+// Cada indicador aporta:
+//   - numérico con objetivo: min(100, valor/objetivo*100)
+//   - texto/cualitativo: según su estado_semaforo (verde=100, amarillo=50, rojo=10)
+//   - sin datos: no cuenta
+export function calcularAvancePorIndicadores(
+  indicadores: {
+    valor_actual: number | null;
+    valor_objetivo: number | null;
+    valor_actual_texto?: string | null;
+    estado_semaforo: EstadoSemaforo;
+  }[]
+): { porcentaje: number | null; conDatos: number; total: number; estado: EstadoSemaforo } {
+  const total = indicadores.length;
+  if (total === 0) return { porcentaje: null, conDatos: 0, total: 0, estado: "sin_datos" };
+
+  let suma = 0;
+  let cnt = 0;
+  for (const i of indicadores) {
+    if (i.valor_actual != null && i.valor_objetivo != null) {
+      const pct = i.valor_objetivo === 0
+        ? (i.valor_actual >= i.valor_objetivo ? 100 : 0)
+        : Math.max(0, Math.min(100, (i.valor_actual / i.valor_objetivo) * 100));
+      suma += pct;
+      cnt++;
+    } else if (i.valor_actual_texto && i.valor_actual_texto.trim() !== "") {
+      suma += i.estado_semaforo === "verde" ? 100 : i.estado_semaforo === "amarillo" ? 50 : i.estado_semaforo === "rojo" ? 10 : 0;
+      cnt++;
+    }
+  }
+
+  if (cnt === 0) return { porcentaje: null, conDatos: 0, total, estado: "sin_datos" };
+
+  const avg = Math.round(suma / cnt);
+  const estado: EstadoSemaforo = avg >= 70 ? "verde" : avg >= 40 ? "amarillo" : "rojo";
+  return { porcentaje: avg, conDatos: cnt, total, estado };
+}

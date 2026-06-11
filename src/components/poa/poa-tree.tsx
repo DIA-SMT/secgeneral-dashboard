@@ -188,10 +188,15 @@ function ProyectoNode({ py }: { py: PoaProyecto }) {
           {py.nombre}
         </Link>
         <span className="text-[10px] text-muted shrink-0">{py.metas.length} metas</span>
-        {py.tieneSeguimiento && (
-          <div className="w-20 hidden md:block">
-            <ProgressBar value={py.porcentaje} estado={py.estado} size="sm" />
+        {py.tieneSeguimiento ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-20 hidden md:block">
+              <ProgressBar value={py.porcentaje} estado={py.estado} size="sm" />
+            </div>
+            <span className="text-xs font-bold text-foreground w-9 text-right">{py.porcentaje}%</span>
           </div>
+        ) : (
+          <span className="text-[9px] text-muted/60 uppercase shrink-0">sin datos</span>
         )}
       </div>
       {expanded && (

@@ -3,7 +3,7 @@ import { BackButton } from "@/components/layout/back-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-export const revalidate = 60;
+export const revalidate = 0;
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 

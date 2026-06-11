@@ -89,13 +89,14 @@ export function Sidebar({ rol }: { rol: RolUsuario | null }) {
             height={32}
             className="logo-auto h-8 w-auto opacity-70"
           />
-          {/* Placeholder de Planificación Estratégica — reemplazar src cuando llegue el archivo */}
-          <div
+          <Image
+            src="/logos/logoPlanificacion.jpeg"
+            alt="Dirección de Planificación Estratégica"
             title="Dirección de Planificación Estratégica"
-            className="flex items-center justify-center h-8 w-8 rounded border border-border bg-surface text-[10px] font-bold text-muted/70"
-          >
-            PE
-          </div>
+            width={80}
+            height={32}
+            className="h-8 w-auto rounded opacity-80"
+          />
         </div>
         <p className="text-[9px] text-muted/60 text-center leading-relaxed">
           <span className="font-semibold">PlanIA</span> · desarrollado por la Dirección

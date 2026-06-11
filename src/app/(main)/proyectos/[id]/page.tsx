@@ -7,7 +7,8 @@ import { MetaCardWithForm } from "@/components/dashboard/meta-card-with-form";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
 import { getPerfilActual } from "@/lib/auth";
-import { formatFecha, formatFechaRelativa, calcularEstadoProyecto } from "@/lib/utils";
+import { formatFecha, formatFechaRelativa, calcularEstadoProyecto, calcularAvancePorIndicadores } from "@/lib/utils";
+import { MiniGauge } from "@/components/ui/mini-gauge";
 import { BackButton } from "@/components/layout/back-button";
 import Link from "next/link";
 
@@ -45,6 +46,8 @@ export default async function ProyectoDetallePage({
       (perfil.rol === "director" && perfil.unidad_id === proyecto.unidad_id));
 
   const { porcentaje: avgPct, estado: estadoGlobal, tieneSeguimiento } = calcularEstadoProyecto(metas);
+  // Avance basado en indicadores cargados
+  const avanceInd = calcularAvancePorIndicadores(indicadores);
   const ahora = new Date().toISOString().slice(0, 10);
 
   return (
@@ -77,13 +80,16 @@ export default async function ProyectoDetallePage({
             )}
           </div>
           <div className="flex items-center gap-6 shrink-0">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-foreground">{tieneSeguimiento ? `${avgPct ?? 0}%` : "—"}</p>
-              <p className="text-xs text-muted">Avance</p>
-            </div>
+            <MiniGauge
+              value={avanceInd.porcentaje}
+              estado={avanceInd.estado}
+              size={72}
+              label="Avance (indicadores)"
+            />
             <div className="text-center">
               <p className="text-3xl font-bold text-foreground">{indicadores.length}</p>
               <p className="text-xs text-muted">Indicadores</p>
+              <p className="text-[9px] text-muted/70">{avanceInd.conDatos} con datos</p>
             </div>
           </div>
         </div>

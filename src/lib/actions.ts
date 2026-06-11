@@ -39,8 +39,12 @@ export async function guardarAgendaSemana(input: {
 
   const semanaId = (semana as { id: string }).id;
 
-  // Borrar actividades anteriores
-  await supabase.from("agenda_actividad").delete().eq("agenda_semana_id", semanaId);
+  // Borrar actividades anteriores (reemplazo completo)
+  const { error: delError } = await supabase
+    .from("agenda_actividad")
+    .delete()
+    .eq("agenda_semana_id", semanaId);
+  if (delError) return { success: false, error: delError.message };
 
   // Insertar nuevas
   if (actividades.length > 0) {
