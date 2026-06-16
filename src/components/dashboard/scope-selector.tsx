@@ -31,7 +31,7 @@ export function ScopeSelector({ unidades }: ScopeSelectorProps) {
       onChange={(e) => onChange(e.target.value)}
       className="text-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-foreground focus:outline-none focus:border-primary/50 cursor-pointer mt-2"
     >
-      <option value="">Toda la Secretaría General</option>
+      <option value="">Todas las Secretarías (Municipalidad)</option>
       {secretarias.length > 0 && (
         <optgroup label="Secretarías">
           {secretarias.map((u) => (

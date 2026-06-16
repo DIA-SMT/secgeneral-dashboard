@@ -452,8 +452,11 @@ export async function actualizarIndicador(input: {
   let estado: string;
   if (estado_semaforo_override) {
     estado = estado_semaforo_override;
-  } else if (valor_actual != null) {
+  } else if (valor_actual != null && objetivoEfectivo != null) {
     estado = calcularSemaforo(valor_actual, objetivoEfectivo, 0, invertida);
+  } else if (valor_actual != null) {
+    // Valor numérico cargado sin objetivo → se considera "en ejecución"
+    estado = "amarillo";
   } else if (valor_actual_texto != null && valor_actual_texto.trim() !== "") {
     estado = "amarillo";
   } else {

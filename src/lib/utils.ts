@@ -167,17 +167,26 @@ export function calcularAvancePorIndicadores(
   const total = indicadores.length;
   if (total === 0) return { porcentaje: null, conDatos: 0, total: 0, estado: "sin_datos" };
 
+  const porEstado = (e: EstadoSemaforo) =>
+    e === "verde" ? 100 : e === "rojo" ? 10 : 50; // amarillo/sin_datos → 50 (en ejecución)
+
   let suma = 0;
   let cnt = 0;
   for (const i of indicadores) {
     if (i.valor_actual != null && i.valor_objetivo != null) {
+      // Numérico con objetivo → porcentaje real
       const pct = i.valor_objetivo === 0
         ? (i.valor_actual >= i.valor_objetivo ? 100 : 0)
         : Math.max(0, Math.min(100, (i.valor_actual / i.valor_objetivo) * 100));
       suma += pct;
       cnt++;
+    } else if (i.valor_actual != null) {
+      // Numérico SIN objetivo cargado: igual cuenta como avance reportado
+      suma += porEstado(i.estado_semaforo);
+      cnt++;
     } else if (i.valor_actual_texto && i.valor_actual_texto.trim() !== "") {
-      suma += i.estado_semaforo === "verde" ? 100 : i.estado_semaforo === "amarillo" ? 50 : i.estado_semaforo === "rojo" ? 10 : 0;
+      // Texto (Sí/No, Realizado) → según su semáforo
+      suma += porEstado(i.estado_semaforo);
       cnt++;
     }
   }
