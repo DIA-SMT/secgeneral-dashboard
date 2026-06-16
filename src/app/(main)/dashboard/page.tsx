@@ -5,6 +5,7 @@ import { SemaforoSummary } from "@/components/ui/semaforo-summary";
 import { ProyectoCard } from "@/components/dashboard/proyecto-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
+import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatFecha, calcularEstadoProyecto } from "@/lib/utils";
 import type { EstadoSemaforo, Meta, UnidadOrganizacional } from "@/types/database";
@@ -97,10 +98,13 @@ export default async function DashboardPage({ searchParams }: Props) {
             <p className="mt-1 text-xs text-muted">Ámbito: {scopeUnidad.nombre}</p>
           )}
         </div>
-        <Link href="/tv" target="_blank"
-          className="text-xs text-muted hover:text-accent border border-border hover:border-accent/30 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5 self-start">
-          <span>▣</span> Modo TV
-        </Link>
+        <div className="flex flex-col items-end gap-2 self-start">
+          <Link href="/tv" target="_blank"
+            className="text-xs text-muted hover:text-accent border border-border hover:border-accent/30 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5">
+            <span>▣</span> Modo TV
+          </Link>
+          <AutoRefresh intervalSegundos={60} />
+        </div>
       </div>
 
       {/* Banner: planificacion sin seguimiento */}
