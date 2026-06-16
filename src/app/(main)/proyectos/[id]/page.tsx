@@ -1,5 +1,5 @@
 import { getProyecto, getMetasPorProyecto, getHitosPorProyecto, getAvancesPorProyecto } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import type { Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
@@ -27,6 +27,7 @@ export default async function ProyectoDetallePage({
     getAvancesPorProyecto(id),
   ]);
 
+  const supabase = await getSupabaseServer();
   const { data: indData } = await supabase
     .from("indicador")
     .select("*")

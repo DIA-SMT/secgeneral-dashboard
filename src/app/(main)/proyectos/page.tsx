@@ -1,5 +1,5 @@
 import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import { calcularAvancePorIndicadores } from "@/lib/utils";
 import type { Meta, UnidadOrganizacional, Indicador } from "@/types/database";
@@ -22,6 +22,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
     getIndicadores(),
   ]);
 
+  const supabase = await getSupabaseServer();
   const { data: todasMetas } = await supabase
     .from("meta")
     .select("*")

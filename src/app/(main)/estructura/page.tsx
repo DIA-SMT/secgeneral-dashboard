@@ -1,5 +1,5 @@
 import { getUnidades, getPeriodoActivo, getProyectos } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import type { EstadoSemaforo } from "@/types/database";
 import { UnidadNode } from "@/components/estructura/unidad-node";
 
@@ -9,6 +9,7 @@ export default async function EstructuraPage() {
   const [unidades, periodo] = await Promise.all([getUnidades(), getPeriodoActivo()]);
   const proyectos = await getProyectos(periodo.id);
 
+  const supabase = await getSupabaseServer();
   const { data: todasMetas } = await supabase
     .from("meta")
     .select("proyecto_id, estado_semaforo")

@@ -1,5 +1,5 @@
 import { getPeriodoActivo, getProyectos, getUnidades } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { calcularPorcentajeMeta } from "@/lib/utils";
@@ -20,6 +20,7 @@ export default async function MetasPage({ searchParams }: Props) {
   ]);
   const periodoProyectos = await getProyectos(periodo.id);
 
+  const supabase = await getSupabaseServer();
   const { data: metasData } = await supabase
     .from("meta")
     .select("*")

@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSupabaseServer } from "./supabase/server";
 import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, EstadoSemaforo, Indicador, AgendaSemana, AgendaActividad } from "@/types/database";
 
 // Devuelve el lunes ISO (YYYY-MM-DD) de la semana de una fecha dada
@@ -14,6 +14,7 @@ export async function getAgendaSemana(
   unidadId: string,
   fechaLunes: string
 ): Promise<(AgendaSemana & { actividades: AgendaActividad[] }) | null> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("agenda_semana")
     .select("*, actividades:agenda_actividad(*)")
@@ -30,6 +31,7 @@ export async function getAgendaSemana(
 }
 
 export async function getAgendasSemana(fechaLunes: string): Promise<AgendaSemana[]> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("agenda_semana")
     .select("*, unidad:unidad_organizacional(*), actividades:agenda_actividad(*)")
@@ -44,6 +46,7 @@ export async function getAgendasSemana(fechaLunes: string): Promise<AgendaSemana
 // -------------------------------------------------------
 
 export async function getPeriodoActivo(): Promise<Periodo> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("periodo")
     .select("*")
@@ -54,6 +57,7 @@ export async function getPeriodoActivo(): Promise<Periodo> {
 }
 
 export async function getUnidades(): Promise<UnidadOrganizacional[]> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("unidad_organizacional")
     .select("*")
@@ -65,6 +69,7 @@ export async function getUnidades(): Promise<UnidadOrganizacional[]> {
 }
 
 export async function getProyectos(periodoId: string): Promise<(Proyecto & { unidad: UnidadOrganizacional })[]> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("proyecto")
     .select("*, unidad:unidad_organizacional(*)")
@@ -76,6 +81,7 @@ export async function getProyectos(periodoId: string): Promise<(Proyecto & { uni
 }
 
 export async function getProyecto(id: string): Promise<Proyecto & { unidad: UnidadOrganizacional }> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("proyecto")
     .select("*, unidad:unidad_organizacional(*)")
@@ -86,6 +92,7 @@ export async function getProyecto(id: string): Promise<Proyecto & { unidad: Unid
 }
 
 export async function getMetasPorProyecto(proyectoId: string): Promise<Meta[]> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("meta")
     .select("*")
@@ -97,6 +104,7 @@ export async function getMetasPorProyecto(proyectoId: string): Promise<Meta[]> {
 }
 
 export async function getHitosPorProyecto(proyectoId: string): Promise<Hito[]> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("hito")
     .select("*")
@@ -108,6 +116,7 @@ export async function getHitosPorProyecto(proyectoId: string): Promise<Hito[]> {
 }
 
 export async function getAvancesPorProyecto(proyectoId: string): Promise<Avance[]> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("avance")
     .select("*")
@@ -119,6 +128,7 @@ export async function getAvancesPorProyecto(proyectoId: string): Promise<Avance[
 }
 
 export async function getTodosLosHitos(periodoId: string) {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("hito")
     .select("*, proyecto:proyecto!inner(id, nombre, codigo, periodo_id)")
@@ -130,6 +140,7 @@ export async function getTodosLosHitos(periodoId: string) {
 }
 
 export async function getIndicadores(): Promise<Indicador[]> {
+  const supabase = await getSupabaseServer();
   // Paginar para evitar el límite default de 1000 rows
   const all: Indicador[] = [];
   const pageSize = 1000;
@@ -157,6 +168,7 @@ export async function getIndicadoresStats(
   periodoId: string,
   unidadIds?: string[] | null
 ) {
+  const supabase = await getSupabaseServer();
   const estados = ["verde", "amarillo", "rojo", "sin_datos"] as const;
   const baseQuery = () => {
     let q = supabase
@@ -185,6 +197,7 @@ export async function getIndicadoresStats(
 }
 
 export async function getIndicadoresPorMeta(metaId: string): Promise<Indicador[]> {
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("indicador")
     .select("*")
@@ -196,6 +209,7 @@ export async function getIndicadoresPorMeta(metaId: string): Promise<Indicador[]
 }
 
 export async function getResumenDashboard(periodoId: string) {
+  const supabase = await getSupabaseServer();
   const proyectos = await getProyectos(periodoId);
   const proyectoIds = proyectos.map((p) => p.id);
 

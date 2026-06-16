@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BackButton } from "@/components/layout/back-button";
 import { IndicadorCargaForm } from "@/components/indicadores/indicador-carga-form";
@@ -17,6 +17,7 @@ export default async function IndicadorDetallePage({
 }) {
   const { id } = await params;
 
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("indicador")
     .select("*, meta:meta(*, proyecto:proyecto(*, unidad:unidad_organizacional(*)))")
