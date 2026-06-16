@@ -19,11 +19,11 @@ export function semaforoColor(estado: EstadoSemaforo): string {
 // "sin_datos" NO es "Atrasado". Es "Pendiente" — aun no se cargo seguimiento.
 export function semaforoLabel(estado: EstadoSemaforo): string {
   const map: Record<EstadoSemaforo, string> = {
-    verde: "Al día",
-    amarillo: "En atención",
-    rojo: "Atrasado",
+    verde: "Finalizado",
+    amarillo: "En ejecución",
+    rojo: "No iniciado",
     gris: "Inactivo",
-    sin_datos: "Pendiente",
+    sin_datos: "Sin datos",
   };
   return map[estado] ?? "Pendiente";
 }

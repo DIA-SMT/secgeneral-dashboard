@@ -266,7 +266,9 @@ export default async function DashboardPage({ searchParams }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {proyectosFiltrados.map((py) => {
               const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-              return <ProyectoCard key={py.id} proyecto={py} metas={metas} />;
+              const av = avancePorProyecto.get(py.id);
+              return <ProyectoCard key={py.id} proyecto={py} metas={metas}
+                avance={av ? { porcentaje: av.porcentaje, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
             })}
           </div>
         ) : (
@@ -288,7 +290,9 @@ export default async function DashboardPage({ searchParams }: Props) {
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                     {pysSub.slice(0, 9).map((py) => {
                       const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-                      return <ProyectoCard key={py.id} proyecto={py} metas={metas} />;
+                      const av = avancePorProyecto.get(py.id);
+                      return <ProyectoCard key={py.id} proyecto={py} metas={metas}
+                        avance={av ? { porcentaje: av.porcentaje, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
                     })}
                   </div>
                   {pysSub.length > 9 && (

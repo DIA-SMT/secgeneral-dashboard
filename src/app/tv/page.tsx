@@ -102,7 +102,7 @@ export default async function TvPage() {
         {/* Semaforo visual */}
         <div className="col-span-6 row-span-1 rounded-2xl border border-border bg-surface flex items-center gap-6 px-8">
           <SemaforoBlock color="bg-success" count={resumen.metasSemaforo.verde} label="Al día" total={resumen.totalMetas} />
-          <SemaforoBlock color="bg-warning" count={resumen.metasSemaforo.amarillo} label="Atención" total={resumen.totalMetas} />
+          <SemaforoBlock color="bg-warning" count={resumen.metasSemaforo.amarillo} label="En ejecución" total={resumen.totalMetas} />
           <SemaforoBlock color="bg-danger" count={resumen.metasSemaforo.rojo} label="En riesgo" total={resumen.totalMetas} />
           <SemaforoBlock color="bg-primary/30" count={resumen.metasSemaforo.sin_datos} label="Pendientes" total={resumen.totalMetas} />
         </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Proyecto, Meta } from "@/types/database";
+import type { Proyecto, Meta, EstadoSemaforo } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { formatFechaRelativa, calcularEstadoProyecto } from "@/lib/utils";
@@ -7,10 +7,15 @@ import { formatFechaRelativa, calcularEstadoProyecto } from "@/lib/utils";
 interface ProyectoCardProps {
   proyecto: Proyecto;
   metas: Meta[];
+  // Avance precalculado (a partir de indicadores). Si viene, prevalece sobre el cálculo por metas.
+  avance?: { porcentaje: number | null; estado: EstadoSemaforo; tieneSeguimiento: boolean };
 }
 
-export function ProyectoCard({ proyecto, metas }: ProyectoCardProps) {
-  const { porcentaje, estado, tieneSeguimiento } = calcularEstadoProyecto(metas);
+export function ProyectoCard({ proyecto, metas, avance }: ProyectoCardProps) {
+  const calc = calcularEstadoProyecto(metas);
+  const porcentaje = avance ? avance.porcentaje : calc.porcentaje;
+  const estado = avance ? avance.estado : calc.estado;
+  const tieneSeguimiento = avance ? avance.tieneSeguimiento : calc.tieneSeguimiento;
 
   const ultimaAct = metas
     .map((m) => m.ultima_actualizacion)
@@ -45,7 +50,7 @@ export function ProyectoCard({ proyecto, metas }: ProyectoCardProps) {
       </div>
 
       {tieneSeguimiento ? (
-        <ProgressBar value={porcentaje} estado={estado} size="sm" />
+        <ProgressBar value={porcentaje ?? 0} estado={estado} size="sm" />
       ) : (
         <div className="h-2 rounded-full bg-border/30" />
       )}
