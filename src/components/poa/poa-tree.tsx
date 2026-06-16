@@ -51,6 +51,7 @@ export interface PoaArbolNodo {
 
 interface Props {
   arbol: PoaArbolNodo[];
+  autoExpand?: boolean;
 }
 
 function contarIndicadores(proyectos: PoaProyecto[]) {
@@ -63,7 +64,7 @@ function contarMetas(proyectos: PoaProyecto[]) {
   return proyectos.reduce((acc, p) => acc + p.metas.length, 0);
 }
 
-export function PoaTree({ arbol }: Props) {
+export function PoaTree({ arbol, autoExpand = false }: Props) {
   if (arbol.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface p-8 text-center">
@@ -74,13 +75,13 @@ export function PoaTree({ arbol }: Props) {
   return (
     <div className="space-y-2">
       {arbol.map((nodo) => (
-        <SecretariaNode key={nodo.unidad.id} nodo={nodo} />
+        <SecretariaNode key={nodo.unidad.id} nodo={nodo} autoExpand={autoExpand} />
       ))}
     </div>
   );
 }
 
-function SecretariaNode({ nodo }: { nodo: PoaArbolNodo }) {
+function SecretariaNode({ nodo, autoExpand }: { nodo: PoaArbolNodo; autoExpand: boolean }) {
   const todosProyectos = [
     ...nodo.dirsDirectas.flatMap((d) => d.proyectos),
     ...nodo.subs.flatMap((s) => s.dirs.flatMap((d) => d.proyectos)),
@@ -91,7 +92,7 @@ function SecretariaNode({ nodo }: { nodo: PoaArbolNodo }) {
   const totalInd = contarIndicadores(todosProyectos);
 
   return (
-    <details className="rounded-xl border border-border bg-surface overflow-hidden">
+    <details open={autoExpand} className="rounded-xl border border-border bg-surface overflow-hidden">
       <summary className="cursor-pointer p-4 hover:bg-surface-hover transition-colors flex items-center gap-3">
         <span className="text-muted text-xs w-3 group-open:rotate-90 transition-transform">▸</span>
         <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
@@ -106,10 +107,10 @@ function SecretariaNode({ nodo }: { nodo: PoaArbolNodo }) {
       </summary>
       <div className="px-4 pb-4 space-y-2 border-t border-border/50">
         {nodo.subs.map((s) => (
-          <SubsecretariaNode key={s.unidad.id} sub={s} />
+          <SubsecretariaNode key={s.unidad.id} sub={s} autoExpand={autoExpand} />
         ))}
         {nodo.dirsDirectas.map((d) => (
-          <DireccionNode key={d.unidad.id} dir={d} />
+          <DireccionNode key={d.unidad.id} dir={d} autoExpand={autoExpand} />
         ))}
       </div>
     </details>
@@ -118,13 +119,15 @@ function SecretariaNode({ nodo }: { nodo: PoaArbolNodo }) {
 
 function SubsecretariaNode({
   sub,
+  autoExpand,
 }: {
   sub: { unidad: UnidadOrganizacional; dirs: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[] };
+  autoExpand: boolean;
 }) {
   const totalPy = sub.dirs.reduce((acc, d) => acc + d.proyectos.length, 0);
   if (totalPy === 0) return null;
   return (
-    <details className="rounded-lg border border-border/60 bg-background/40 ml-4">
+    <details open={autoExpand} className="rounded-lg border border-border/60 bg-background/40 ml-4">
       <summary className="cursor-pointer p-3 hover:bg-surface-hover/50 flex items-center gap-2">
         <span className="text-muted text-xs">▸</span>
         <div className="h-6 w-6 rounded bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">
@@ -135,7 +138,7 @@ function SubsecretariaNode({
       </summary>
       <div className="px-3 pb-3 space-y-1.5 border-t border-border/30">
         {sub.dirs.map((d) => (
-          <DireccionNode key={d.unidad.id} dir={d} />
+          <DireccionNode key={d.unidad.id} dir={d} autoExpand={autoExpand} />
         ))}
       </div>
     </details>
@@ -144,12 +147,14 @@ function SubsecretariaNode({
 
 function DireccionNode({
   dir,
+  autoExpand,
 }: {
   dir: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] };
+  autoExpand: boolean;
 }) {
   if (dir.proyectos.length === 0) return null;
   return (
-    <details className="rounded-lg border border-border/40 bg-background/20 ml-4">
+    <details open={autoExpand} className="rounded-lg border border-border/40 bg-background/20 ml-4">
       <summary className="cursor-pointer p-2.5 hover:bg-surface-hover/30 flex items-center gap-2">
         <span className="text-muted text-xs">▸</span>
         <p className="text-xs font-semibold text-accent uppercase tracking-wider flex-1 line-clamp-1">

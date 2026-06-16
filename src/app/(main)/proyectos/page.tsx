@@ -169,7 +169,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
         </Suspense>
       </div>
 
-      <PoaTree arbol={arbol} />
+      <PoaTree arbol={arbol} autoExpand={!!(params.dir || params.q || (params.estado && params.estado !== "todos"))} />
     </div>
   );
 }

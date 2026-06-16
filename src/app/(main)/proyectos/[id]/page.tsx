@@ -54,9 +54,20 @@ export default async function ProyectoDetallePage({
     <div className="space-y-6 max-w-5xl">
       {/* Back + Breadcrumb */}
       <div className="flex items-center justify-between gap-3">
-        <BackButton fallback="/proyectos" />
+        <BackButton fallback={`/proyectos?dir=${proyecto.unidad_id}`} />
         <nav className="flex items-center gap-2 text-sm text-muted min-w-0">
           <Link href="/proyectos" className="hover:text-primary transition-colors">Proyectos</Link>
+          {proyecto.unidad && (
+            <>
+              <span>/</span>
+              <Link
+                href={`/proyectos?dir=${proyecto.unidad_id}`}
+                className="hover:text-primary transition-colors line-clamp-1"
+              >
+                {proyecto.unidad.nombre_corto ?? proyecto.unidad.nombre}
+              </Link>
+            </>
+          )}
           <span>/</span>
           <span className="text-foreground line-clamp-1">{proyecto.nombre}</span>
         </nav>

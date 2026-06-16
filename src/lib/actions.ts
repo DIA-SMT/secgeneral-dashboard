@@ -28,8 +28,10 @@ export async function guardarAgendaSemana(input: {
 }) {
   const { unidad_id, fecha_lunes, formato_libre, actividades } = input;
 
+  const sb = await getSupabaseServer();
+
   // Upsert de la semana
-  const { data: semana, error: semanaError } = await supabase
+  const { data: semana, error: semanaError } = await sb
     .from("agenda_semana")
     .upsert({ unidad_id, fecha_lunes, formato_libre: formato_libre ?? null }, { onConflict: "unidad_id,fecha_lunes" })
     .select()
@@ -40,7 +42,7 @@ export async function guardarAgendaSemana(input: {
   const semanaId = (semana as { id: string }).id;
 
   // Borrar actividades anteriores (reemplazo completo)
-  const { error: delError } = await supabase
+  const { error: delError } = await sb
     .from("agenda_actividad")
     .delete()
     .eq("agenda_semana_id", semanaId);
@@ -58,7 +60,7 @@ export async function guardarAgendaSemana(input: {
       horario: a.horario ?? null,
       observacion: a.observacion ?? null,
     }));
-    const { error: actError } = await supabase.from("agenda_actividad").insert(rows);
+    const { error: actError } = await sb.from("agenda_actividad").insert(rows);
     if (actError) return { success: false, error: actError.message };
   }
 
@@ -106,8 +108,11 @@ interface CargarAvanceInput {
 export async function cargarAvance(input: CargarAvanceInput) {
   const { proyecto_id, meta_id, tipo_medicion, valor_numerico, valor_cualitativo, observacion } = input;
 
+  // Cliente con sesión del usuario → RLS valida que sea Director del área o admin
+  const sb = await getSupabaseServer();
+
   // 1. Insertar avance (append-only)
-  const { error: avanceError } = await supabase.from("avance").insert({
+  const { error: avanceError } = await sb.from("avance").insert({
     proyecto_id,
     meta_id,
     fuente: "manual",
@@ -126,7 +131,7 @@ export async function cargarAvance(input: CargarAvanceInput) {
 
   if (tipo_medicion === "cuantitativo" && valor_numerico != null) {
     // Obtener meta para calcular semaforo
-    const { data: meta } = await supabase
+    const { data: meta } = await sb
       .from("meta")
       .select("valor_meta, valor_linea_base, fecha_limite, metadata")
       .eq("id", meta_id)
@@ -151,7 +156,7 @@ export async function cargarAvance(input: CargarAvanceInput) {
       estado_semaforo = pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : "rojo";
     }
 
-    await supabase
+    await sb
       .from("meta")
       .update({
         valor_actual: valor_numerico,
@@ -163,7 +168,7 @@ export async function cargarAvance(input: CargarAvanceInput) {
 
   if (tipo_medicion === "cualitativo" && valor_cualitativo) {
     // Obtener escala para derivar semaforo
-    const { data: meta } = await supabase
+    const { data: meta } = await sb
       .from("meta")
       .select("escala_cualitativa")
       .eq("id", meta_id)
@@ -179,7 +184,7 @@ export async function cargarAvance(input: CargarAvanceInput) {
       }
     }
 
-    await supabase
+    await sb
       .from("meta")
       .update({
         nivel_actual: valor_cualitativo,
@@ -190,7 +195,7 @@ export async function cargarAvance(input: CargarAvanceInput) {
   }
 
   if (tipo_medicion === "hito_unico") {
-    await supabase
+    await sb
       .from("meta")
       .update({
         valor_actual: 1,
@@ -424,7 +429,8 @@ export async function actualizarIndicador(input: {
     proyecto_id,
   } = input;
 
-  const { data: ind } = await supabase
+  const sb = await getSupabaseServer();
+  const { data: ind } = await sb
     .from("indicador")
     .select("valor_objetivo, metadata")
     .eq("id", indicador_id)
@@ -463,7 +469,7 @@ export async function actualizarIndicador(input: {
   if (unidad_medida !== undefined) update.unidad_medida = unidad_medida;
   if (observacion !== undefined) update.observacion = observacion;
 
-  const { error } = await supabase
+  const { error } = await sb
     .from("indicador")
     .update(update)
     .eq("id", indicador_id);
@@ -474,6 +480,7 @@ export async function actualizarIndicador(input: {
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
   revalidatePath(`/indicadores/${indicador_id}`);
+  revalidatePath("/avance-direcciones");
   revalidatePath("/dashboard");
   revalidatePath("/tv");
 
@@ -493,7 +500,8 @@ export async function borrarValorIndicador(input: {
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
-  const { error } = await supabase
+  const sb = await getSupabaseServer();
+  const { error } = await sb
     .from("indicador")
     .update({
       valor_actual: null,
@@ -508,6 +516,7 @@ export async function borrarValorIndicador(input: {
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
   revalidatePath(`/indicadores/${input.indicador_id}`);
+  revalidatePath("/avance-direcciones");
   revalidatePath("/dashboard");
   return { success: true };
 }
@@ -540,7 +549,8 @@ export async function editarIndicador(input: {
   if (input.valor_objetivo !== undefined) update.valor_objetivo = input.valor_objetivo;
   if (input.valor_objetivo_texto !== undefined) update.valor_objetivo_texto = input.valor_objetivo_texto;
 
-  const { error } = await supabase
+  const sb = await getSupabaseServer();
+  const { error } = await sb
     .from("indicador")
     .update(update)
     .eq("id", input.indicador_id);
@@ -549,6 +559,7 @@ export async function editarIndicador(input: {
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
   revalidatePath(`/indicadores/${input.indicador_id}`);
+  revalidatePath("/avance-direcciones");
   return { success: true };
 }
 
@@ -564,7 +575,8 @@ export async function eliminarIndicador(input: {
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
-  const { error } = await supabase
+  const sb = await getSupabaseServer();
+  const { error } = await sb
     .from("indicador")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", input.indicador_id);
@@ -572,6 +584,7 @@ export async function eliminarIndicador(input: {
   if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
+  revalidatePath("/avance-direcciones");
   revalidatePath("/dashboard");
   return { success: true };
 }
@@ -591,7 +604,8 @@ export async function crearIndicador(input: {
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
-  const { error } = await supabase.from("indicador").insert({
+  const sb = await getSupabaseServer();
+  const { error } = await sb.from("indicador").insert({
     meta_id: input.meta_id,
     nombre: input.nombre,
     unidad_medida: input.unidad_medida ?? null,
@@ -602,6 +616,7 @@ export async function crearIndicador(input: {
   if (error) return { success: false, error: error.message };
 
   if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/avance-direcciones");
   revalidatePath("/indicadores");
   revalidatePath("/dashboard");
 
@@ -626,8 +641,10 @@ export async function corregirAvance(input: {
     return { success: false, error: "El motivo de la corrección es obligatorio." };
   }
 
+  const sb = await getSupabaseServer();
+
   // 1. Insertar avance correctivo (append-only)
-  const { error: avanceError } = await supabase.from("avance").insert({
+  const { error: avanceError } = await sb.from("avance").insert({
     proyecto_id,
     meta_id,
     fuente: "correccion",
@@ -643,7 +660,7 @@ export async function corregirAvance(input: {
   const ahora = new Date().toISOString();
 
   if (tipo_medicion === "cuantitativo" && valor_numerico != null) {
-    const { data: meta } = await supabase
+    const { data: meta } = await sb
       .from("meta")
       .select("valor_meta, valor_linea_base, metadata")
       .eq("id", meta_id)
@@ -657,7 +674,7 @@ export async function corregirAvance(input: {
       invertida
     );
 
-    await supabase
+    await sb
       .from("meta")
       .update({
         valor_actual: valor_numerico,
@@ -668,7 +685,7 @@ export async function corregirAvance(input: {
   }
 
   if (tipo_medicion === "cualitativo" && valor_cualitativo) {
-    const { data: meta } = await supabase
+    const { data: meta } = await sb
       .from("meta")
       .select("escala_cualitativa")
       .eq("id", meta_id)
@@ -682,7 +699,7 @@ export async function corregirAvance(input: {
         estado = pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : pct > 0 ? "rojo" : "sin_datos";
       }
     }
-    await supabase
+    await sb
       .from("meta")
       .update({
         nivel_actual: valor_cualitativo,
