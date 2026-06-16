@@ -68,9 +68,14 @@ export function IndicadoresPanel({
               {editingId === ind.id ? (
                 <EditValue
                   indicador={ind}
-                  onSubmit={(valor) => {
+                  onSubmit={(valor, objetivo) => {
                     startTransition(async () => {
-                      await actualizarIndicador({ indicador_id: ind.id, valor_actual: valor, proyecto_id: proyectoId });
+                      await actualizarIndicador({
+                        indicador_id: ind.id,
+                        valor_actual: valor,
+                        valor_objetivo: objetivo,
+                        proyecto_id: proyectoId,
+                      });
                       setEditingId(null);
                     });
                   }}
@@ -172,11 +177,12 @@ function EditValue({
   isPending,
 }: {
   indicador: Indicador;
-  onSubmit: (valor: number) => void;
+  onSubmit: (valor: number, objetivo: number | null) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
   const [valor, setValor] = useState(indicador.valor_actual?.toString() ?? "");
+  const [objetivo, setObjetivo] = useState(indicador.valor_objetivo?.toString() ?? "");
   return (
     <span className="flex items-center gap-1 shrink-0">
       <input
@@ -185,12 +191,25 @@ function EditValue({
         value={valor}
         onChange={(e) => setValor(e.target.value)}
         autoFocus
-        className="w-16 text-xs bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
+        placeholder="Actual"
+        title="Valor actual"
+        className="w-14 text-xs bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
+      />
+      <span className="text-muted text-[10px]">/</span>
+      <input
+        type="number"
+        step="any"
+        value={objetivo}
+        onChange={(e) => setObjetivo(e.target.value)}
+        placeholder="Objetivo"
+        title="Objetivo / meta a alcanzar"
+        className="w-14 text-xs bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
       />
       <button
-        onClick={() => valor && onSubmit(Number(valor))}
+        onClick={() => valor && onSubmit(Number(valor), objetivo.trim() !== "" ? Number(objetivo) : null)}
         disabled={isPending}
         className="text-[10px] text-success hover:text-success/80 disabled:opacity-50"
+        title="Guardar"
       >
         ✓
       </button>
