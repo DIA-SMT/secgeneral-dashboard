@@ -28,8 +28,8 @@ export function UsuariosTable({ perfiles, unidades, rolActual }: Props) {
     );
 
   return (
-    <div className="rounded-xl border border-border bg-surface overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="rounded-xl border border-border bg-surface overflow-x-auto">
+      <table className="w-full text-sm min-w-[640px]">
         <thead className="bg-border/30 text-xs uppercase tracking-wider text-muted">
           <tr>
             <th className="text-left p-3">Nombre / Email</th>

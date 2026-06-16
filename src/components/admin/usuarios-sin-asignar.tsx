@@ -31,22 +31,11 @@ export function UsuariosSinAsignar({ usuarios, unidades }: Props) {
           asignados. Hasta que les asignes un perfil, no pueden ingresar al sistema.
         </p>
       </div>
-      <table className="w-full text-sm">
-        <thead className="bg-warning/10 text-xs uppercase tracking-wider text-muted">
-          <tr>
-            <th className="text-left p-3">Email</th>
-            <th className="text-left p-3">Nombre</th>
-            <th className="text-left p-3">Rol</th>
-            <th className="text-left p-3">Unidad</th>
-            <th className="p-3"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {usuarios.map((u) => (
-            <SinAsignarRow key={u.user_id} usuario={u} unidades={unidades} />
-          ))}
-        </tbody>
-      </table>
+      <div className="divide-y divide-warning/15">
+        {usuarios.map((u) => (
+          <SinAsignarRow key={u.user_id} usuario={u} unidades={unidades} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -93,61 +82,66 @@ function SinAsignarRow({
   };
 
   return (
-    <tr className="border-t border-warning/20">
-      <td className="p-3 text-xs text-muted">{usuario.email}</td>
-      <td className="p-3">
-        <input
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Nombre completo"
-          className="w-full text-xs bg-background border border-border rounded px-2 py-1"
-        />
-      </td>
-      <td className="p-3">
-        <select
-          value={rol}
-          onChange={(e) => {
-            const v = e.target.value as RolUsuario;
-            setRol(v);
-            if (!["secretario", "subsecretario", "director"].includes(v)) setUnidadId(null);
-          }}
-          className="text-xs bg-background border border-border rounded px-2 py-1"
-        >
-          {ROLES.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td className="p-3">
-        {requierUnidad ? (
+    <div className="p-3">
+      <p className="text-xs font-medium text-foreground break-all mb-2">{usuario.email}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
+        <div>
+          <label className="text-[10px] text-muted uppercase tracking-wider">Nombre</label>
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Nombre completo"
+            className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 mt-0.5"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted uppercase tracking-wider">Rol</label>
           <select
-            value={unidadId ?? ""}
-            onChange={(e) => setUnidadId(e.target.value || null)}
-            className="text-xs bg-background border border-border rounded px-2 py-1"
+            value={rol}
+            onChange={(e) => {
+              const v = e.target.value as RolUsuario;
+              setRol(v);
+              if (!["secretario", "subsecretario", "director"].includes(v)) setUnidadId(null);
+            }}
+            className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 mt-0.5"
           >
-            <option value="">Seleccionar...</option>
-            {unidadesParaRol.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nombre_corto ?? u.nombre}
+            {ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
               </option>
             ))}
           </select>
-        ) : (
-          <span className="text-xs text-muted">global</span>
-        )}
-      </td>
-      <td className="p-3 text-right">
-        <button
-          onClick={asignar}
-          disabled={isPending}
-          className="text-xs bg-primary/20 text-primary border border-primary/30 rounded px-3 py-1 hover:bg-primary/30 disabled:opacity-50"
-        >
-          {isPending ? "Asignando..." : "Asignar"}
-        </button>
-        {error && <p className="text-[10px] text-danger mt-1">{error}</p>}
-      </td>
-    </tr>
+        </div>
+        <div>
+          <label className="text-[10px] text-muted uppercase tracking-wider">Unidad</label>
+          {requierUnidad ? (
+            <select
+              value={unidadId ?? ""}
+              onChange={(e) => setUnidadId(e.target.value || null)}
+              className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 mt-0.5"
+            >
+              <option value="">Seleccionar...</option>
+              {unidadesParaRol.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nombre_corto ?? u.nombre}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-xs text-muted py-1.5 mt-0.5">Acceso global</p>
+          )}
+        </div>
+        <div>
+          <button
+            onClick={asignar}
+            disabled={isPending}
+            className="w-full text-xs bg-primary text-white rounded px-3 py-1.5 hover:bg-primary/90 disabled:opacity-50"
+          >
+            {isPending ? "Asignando..." : "Asignar"}
+          </button>
+        </div>
+      </div>
+      {error && <p className="text-[10px] text-danger mt-1">{error}</p>}
+    </div>
   );
 }
