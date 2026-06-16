@@ -1,4 +1,4 @@
-import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadoresStats } from "@/lib/queries";
+import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { CircularProgress } from "@/components/ui/circular-progress";
 import { SemaforoSummary } from "@/components/ui/semaforo-summary";
@@ -7,8 +7,8 @@ import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatFecha, calcularEstadoProyecto } from "@/lib/utils";
-import type { EstadoSemaforo, Meta, UnidadOrganizacional } from "@/types/database";
+import { formatFecha, calcularAvancePorIndicadores } from "@/lib/utils";
+import type { EstadoSemaforo, Meta, Indicador, UnidadOrganizacional } from "@/types/database";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -23,6 +23,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const periodo = await getPeriodoActivo();
   const resumen = await getResumenDashboard(periodo.id);
   const unidades = await getUnidades();
+  const indicadores = await getIndicadores();
 
   // Aplicar scope (filtra todo el dashboard por una rama del organigrama)
   const scopeId = params.scope;
@@ -50,16 +51,67 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const proyectosActivos = proyectosScope.filter((p) => p.estado === "activo");
 
-  // Indicadores con scope aplicado (count server-side respeta scope)
-  const indicadoresStats = scopeUnidadIds
-    ? await getIndicadoresStats(periodo.id, Array.from(scopeUnidadIds))
-    : { total: resumen.totalIndicadores, semaforo: resumen.indicadoresSemaforo };
+  // -------------------------------------------------------
+  // Avance basado en INDICADORES (lo que cargan los directores)
+  // -------------------------------------------------------
+  type IndConRel = Indicador & { meta?: { proyecto?: { id: string; unidad_id: string } } };
+  const indByProyecto = new Map<string, Indicador[]>();
+  const indByUnidad = new Map<string, Indicador[]>();
+  for (const i of indicadores as IndConRel[]) {
+    const pyId = i.meta?.proyecto?.id;
+    const uId = i.meta?.proyecto?.unidad_id;
+    if (pyId) (indByProyecto.get(pyId) ?? indByProyecto.set(pyId, []).get(pyId)!).push(i);
+    if (uId) (indByUnidad.get(uId) ?? indByUnidad.set(uId, []).get(uId)!).push(i);
+  }
 
-  const estadoGlobal: EstadoSemaforo = !resumen.tieneSeguimiento
+  // Indicadores dentro del scope
+  const indScope = scopeUnidadIds
+    ? (indicadores as IndConRel[]).filter((i) => {
+        const uId = i.meta?.proyecto?.unidad_id;
+        return uId ? scopeUnidadIds.has(uId) : false;
+      })
+    : (indicadores as IndConRel[]);
+
+  const indicadoresStats = {
+    total: indScope.length,
+    semaforo: {
+      verde: indScope.filter((i) => i.estado_semaforo === "verde").length,
+      amarillo: indScope.filter((i) => i.estado_semaforo === "amarillo").length,
+      rojo: indScope.filter((i) => i.estado_semaforo === "rojo").length,
+      sin_datos: indScope.filter((i) => i.estado_semaforo === "sin_datos" || i.estado_semaforo === "gris").length,
+    },
+  };
+
+  // Avance por proyecto (a partir de sus indicadores)
+  const avancePorProyecto = new Map<string, ReturnType<typeof calcularAvancePorIndicadores>>();
+  for (const py of proyectosActivos) {
+    avancePorProyecto.set(py.id, calcularAvancePorIndicadores(indByProyecto.get(py.id) ?? []));
+  }
+
+  // Avance global = promedio de proyectos con datos
+  const proyectosConDatos = proyectosActivos.filter((p) => (avancePorProyecto.get(p.id)?.conDatos ?? 0) > 0);
+  const porcentajeGlobal =
+    proyectosConDatos.length > 0
+      ? Math.round(
+          proyectosConDatos.reduce((acc, p) => acc + (avancePorProyecto.get(p.id)?.porcentaje ?? 0), 0) /
+            proyectosConDatos.length
+        )
+      : null;
+  const tieneSeguimiento = proyectosConDatos.length > 0;
+
+  // Distribución de proyectos por estado (semáforo) según sus indicadores
+  const distribucionProyectos = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
+  for (const py of proyectosActivos) {
+    const av = avancePorProyecto.get(py.id);
+    if (!av || av.conDatos === 0) distribucionProyectos.sin_datos++;
+    else distribucionProyectos[av.estado as "verde" | "amarillo" | "rojo"]++;
+  }
+
+  const estadoGlobal: EstadoSemaforo = !tieneSeguimiento
     ? "sin_datos"
-    : resumen.porcentajeGlobal != null && resumen.porcentajeGlobal >= 70
+    : porcentajeGlobal != null && porcentajeGlobal >= 70
     ? "verde"
-    : resumen.porcentajeGlobal != null && resumen.porcentajeGlobal >= 40
+    : porcentajeGlobal != null && porcentajeGlobal >= 40
     ? "amarillo"
     : "rojo";
 
@@ -72,20 +124,16 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const scopeUnidad = scopeId ? unidades.find((u) => u.id === scopeId) ?? null : null;
 
-  // Filtrado (sobre el scope ya aplicado)
+  // Filtrado: el ámbito (scope) es el único filtro de área. Acá solo el estado.
   let proyectosFiltrados = proyectosActivos;
-  if (params.unidad) {
-    const unidadHijos = descendientes(params.unidad);
-    proyectosFiltrados = proyectosFiltrados.filter((p) => unidadHijos.includes(p.unidad_id));
-  }
   if (params.estado && params.estado !== "todos") {
     proyectosFiltrados = proyectosFiltrados.filter((py) => {
-      const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-      const { estado } = calcularEstadoProyecto(metas);
+      const av = avancePorProyecto.get(py.id);
+      const estado = !av || av.conDatos === 0 ? "sin_datos" : av.estado;
       return estado === params.estado;
     });
   }
-  const hayFiltros = !!params.unidad || (!!params.estado && params.estado !== "todos");
+  const hayFiltros = !!scopeId || (!!params.estado && params.estado !== "todos");
 
   return (
     <div className="space-y-8 max-w-7xl">
@@ -128,8 +176,8 @@ export default async function DashboardPage({ searchParams }: Props) {
       {/* KPIs: Avance global → Proyectos → Metas → Indicadores */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="sm:col-span-2 lg:col-span-1 rounded-2xl border border-border bg-surface p-6 flex items-center gap-6">
-          {resumen.tieneSeguimiento && resumen.porcentajeGlobal != null ? (
-            <CircularProgress value={resumen.porcentajeGlobal} estado={estadoGlobal} size={110} strokeWidth={10} />
+          {tieneSeguimiento && porcentajeGlobal != null ? (
+            <CircularProgress value={porcentajeGlobal} estado={estadoGlobal} size={110} strokeWidth={10} />
           ) : (
             <div className="h-[110px] w-[110px] rounded-full border-[10px] border-border/30 flex items-center justify-center shrink-0">
               <span className="text-2xl font-light text-muted/40">—</span>
@@ -137,8 +185,8 @@ export default async function DashboardPage({ searchParams }: Props) {
           )}
           <div>
             <p className="text-xs text-muted uppercase tracking-widest font-medium">Avance Global</p>
-            {resumen.tieneSeguimiento && resumen.porcentajeGlobal != null ? (
-              <p className="text-lg font-semibold text-foreground mt-1">{resumen.porcentajeGlobal}% ejecutado</p>
+            {tieneSeguimiento && porcentajeGlobal != null ? (
+              <p className="text-lg font-semibold text-foreground mt-1">{porcentajeGlobal}% ejecutado</p>
             ) : (
               <p className="text-sm text-muted/70 mt-1">Aguardando primer reporte</p>
             )}
@@ -173,10 +221,11 @@ export default async function DashboardPage({ searchParams }: Props) {
         <div className="rounded-2xl border border-border bg-surface p-5">
           <p className="text-xs text-muted uppercase tracking-widest mb-3">Grado de avance de los proyectos</p>
           <SemaforoSummary
-            verde={metasSemaforoScope.verde}
-            amarillo={metasSemaforoScope.amarillo}
-            rojo={metasSemaforoScope.rojo}
-            sin_datos={metasSemaforoScope.sin_datos} />
+            verde={distribucionProyectos.verde}
+            amarillo={distribucionProyectos.amarillo}
+            rojo={distribucionProyectos.rojo}
+            sin_datos={distribucionProyectos.sin_datos}
+            label="proyectos" />
         </div>
 
         {resumen.proximoHito?.fecha_esperada ? (
@@ -243,7 +292,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                     })}
                   </div>
                   {pysSub.length > 9 && (
-                    <Link href={`/dashboard?unidad=${sub.id}`}
+                    <Link href={`/dashboard?scope=${sub.id}`}
                       className="inline-block mt-3 text-xs text-primary hover:text-primary-light transition-colors">
                       Ver los {pysSub.length} proyectos →
                     </Link>

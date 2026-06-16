@@ -414,6 +414,8 @@ export async function actualizarIndicador(input: {
   indicador_id: string;
   valor_actual?: number | null;
   valor_actual_texto?: string | null;
+  valor_objetivo?: number | null;
+  valor_objetivo_texto?: string | null;
   unidad_medida?: string | null;
   observacion?: string | null;
   estado_semaforo_override?: "verde" | "amarillo" | "rojo" | "sin_datos" | null;
@@ -423,6 +425,8 @@ export async function actualizarIndicador(input: {
     indicador_id,
     valor_actual,
     valor_actual_texto,
+    valor_objetivo,
+    valor_objetivo_texto,
     unidad_medida,
     observacion,
     estado_semaforo_override,
@@ -437,16 +441,20 @@ export async function actualizarIndicador(input: {
     .single();
 
   const invertida = (ind?.metadata as Record<string, unknown> | undefined)?.invertida === true;
+  // Objetivo efectivo: el nuevo si vino en este submit, sino el ya guardado.
+  const objetivoEfectivo =
+    valor_objetivo !== undefined && valor_objetivo !== null
+      ? valor_objetivo
+      : (ind?.valor_objetivo as number | null) ?? null;
 
   // Si el usuario eligió un estado manualmente (caso texto), respetarlo.
-  // Sino, calcular del valor numérico cuando exista.
+  // Sino, calcular del valor numérico contra el objetivo efectivo.
   let estado: string;
   if (estado_semaforo_override) {
     estado = estado_semaforo_override;
   } else if (valor_actual != null) {
-    estado = calcularSemaforo(valor_actual, ind?.valor_objetivo ?? null, 0, invertida);
+    estado = calcularSemaforo(valor_actual, objetivoEfectivo, 0, invertida);
   } else if (valor_actual_texto != null && valor_actual_texto.trim() !== "") {
-    // Hay texto sin override → considerar "en ejecución" (avance reportado pero sin score numérico)
     estado = "amarillo";
   } else {
     estado = "sin_datos";
@@ -455,6 +463,8 @@ export async function actualizarIndicador(input: {
   type UpdatePayload = {
     valor_actual?: number | null;
     valor_actual_texto?: string | null;
+    valor_objetivo?: number | null;
+    valor_objetivo_texto?: string | null;
     unidad_medida?: string | null;
     observacion?: string | null;
     estado_semaforo: string;
@@ -466,6 +476,8 @@ export async function actualizarIndicador(input: {
   };
   if (valor_actual !== undefined) update.valor_actual = valor_actual;
   if (valor_actual_texto !== undefined) update.valor_actual_texto = valor_actual_texto;
+  if (valor_objetivo !== undefined) update.valor_objetivo = valor_objetivo;
+  if (valor_objetivo_texto !== undefined) update.valor_objetivo_texto = valor_objetivo_texto;
   if (unidad_medida !== undefined) update.unidad_medida = unidad_medida;
   if (observacion !== undefined) update.observacion = observacion;
 

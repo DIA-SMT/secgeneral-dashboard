@@ -13,7 +13,9 @@ export interface PoaIndicador {
   codigo: string | null;
   nombre: string;
   valor_actual: number | null;
+  valor_actual_texto: string | null;
   valor_objetivo: number | null;
+  valor_objetivo_texto: string | null;
   unidad_medida: string | null;
   estado_semaforo: EstadoSemaforo;
 }
@@ -287,8 +289,11 @@ function IndicadorRow({
           {ind.nombre}
         </Link>
         <span className="text-[10px] text-muted shrink-0">
-          {ind.valor_actual ?? "—"}
-          {ind.valor_objetivo != null && <> / {ind.valor_objetivo}</>} {ind.unidad_medida ?? ""}
+          {ind.valor_actual_texto ?? ind.valor_actual ?? "—"}
+          {(ind.valor_objetivo_texto ?? ind.valor_objetivo) != null && (
+            <> / {ind.valor_objetivo_texto ?? ind.valor_objetivo}</>
+          )}{" "}
+          {ind.unidad_medida ?? ""}
         </span>
         {puedeCargar && (
           <button
@@ -305,7 +310,9 @@ function IndicadorRow({
             indicadorId={ind.id}
             proyectoId={proyectoId}
             valorActual={ind.valor_actual}
+            valorActualTexto={ind.valor_actual_texto}
             valorObjetivo={ind.valor_objetivo}
+            valorObjetivoTexto={ind.valor_objetivo_texto}
             unidadMedida={ind.unidad_medida}
             onClose={() => setEditing(false)}
           />

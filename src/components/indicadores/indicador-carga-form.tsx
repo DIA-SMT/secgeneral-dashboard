@@ -34,6 +34,8 @@ export function IndicadorCargaForm({
   );
   const [valorNum, setValorNum] = useState(valorActual?.toString() ?? "");
   const [valorTxt, setValorTxt] = useState(valorActualTexto ?? "");
+  const [objNum, setObjNum] = useState(valorObjetivo?.toString() ?? "");
+  const [objTxt, setObjTxt] = useState(valorObjetivoTexto ?? "");
   const [unidad, setUnidad] = useState(unidadMedida ?? "");
   const [obs, setObs] = useState(obsInicial ?? "");
   const [estadoTexto, setEstadoTexto] = useState<"verde" | "amarillo" | "rojo">("amarillo");
@@ -56,6 +58,8 @@ export function IndicadorCargaForm({
           indicador_id: indicadorId,
           valor_actual: num,
           valor_actual_texto: null,
+          valor_objetivo: objNum.trim() !== "" && isFinite(Number(objNum)) ? Number(objNum) : null,
+          valor_objetivo_texto: null,
           unidad_medida: unidad || null,
           observacion: obs || null,
           proyecto_id: proyectoId,
@@ -77,6 +81,8 @@ export function IndicadorCargaForm({
           indicador_id: indicadorId,
           valor_actual: null,
           valor_actual_texto: valorTxt.trim(),
+          valor_objetivo: null,
+          valor_objetivo_texto: objTxt.trim() || null,
           unidad_medida: unidad || null,
           observacion: obs || null,
           estado_semaforo_override: estadoTexto,
@@ -154,11 +160,25 @@ export function IndicadorCargaForm({
             value={valorNum}
             onChange={(e) => setValorNum(e.target.value)}
             autoFocus
-            placeholder={valorObjetivo != null ? `Objetivo: ${valorObjetivo}` : "Ej: 45"}
+            placeholder={objNum !== "" ? `Objetivo: ${objNum}` : "Ej: 45"}
             className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
           />
           <p className="text-[10px] text-muted mt-1">
             Para porcentajes ingresá el número sin el signo % (ej. 45 = 45%).
+          </p>
+          <label className="text-xs text-muted uppercase tracking-wider mt-3 block">
+            Objetivo / meta a alcanzar {unidad && <span>({unidad})</span>}
+          </label>
+          <input
+            type="number"
+            step="any"
+            value={objNum}
+            onChange={(e) => setObjNum(e.target.value)}
+            placeholder="Ej: 100 (valor a alcanzar)"
+            className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
+          />
+          <p className="text-[10px] text-muted mt-1">
+            El semáforo se calcula como valor actual ÷ objetivo. Si lo dejás vacío, queda en ejecución.
           </p>
         </div>
       ) : (
@@ -171,6 +191,16 @@ export function IndicadorCargaForm({
               onChange={(e) => setValorTxt(e.target.value)}
               autoFocus
               placeholder='Ej: "Sí", "No", "Realizado", "En curso"'
+              className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
+            />
+            <label className="text-xs text-muted uppercase tracking-wider mt-3 block">
+              Objetivo (texto, opcional)
+            </label>
+            <input
+              type="text"
+              value={objTxt}
+              onChange={(e) => setObjTxt(e.target.value)}
+              placeholder='Ej: "Actividad realizada", "Sí"'
               className="mt-1 w-full text-sm bg-surface border border-border rounded px-3 py-2 text-foreground"
             />
           </div>
