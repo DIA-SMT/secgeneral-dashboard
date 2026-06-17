@@ -1,12 +1,18 @@
 import { getUnidades, getPeriodoActivo, getProyectos } from "@/lib/queries";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getPerfilActual } from "@/lib/auth";
+import { esRolGlobal } from "@/lib/utils";
 import type { EstadoSemaforo } from "@/types/database";
 import { UnidadNode } from "@/components/estructura/unidad-node";
 
-export const revalidate = 60;
+export const revalidate = 0;
 
 export default async function EstructuraPage() {
-  const [unidades, periodo] = await Promise.all([getUnidades(), getPeriodoActivo()]);
+  const [unidades, periodo, perfil] = await Promise.all([
+    getUnidades(),
+    getPeriodoActivo(),
+    getPerfilActual(),
+  ]);
   const proyectos = await getProyectos(periodo.id);
 
   const supabase = await getSupabaseServer();
@@ -57,7 +63,12 @@ export default async function EstructuraPage() {
   const semaforosByUnidad: Record<string, Record<EstadoSemaforo, number>> = {};
   for (const u of unidades) semaforosByUnidad[u.id] = contarSemaforos(u.id);
 
-  const raiz = unidades.filter((u) => u.parent_id === null).sort(sortByName);
+  // Raíz del árbol: para roles globales, las secretarías (nivel 0).
+  // Para usuarios con área asignada, arranca en su propia unidad.
+  const raiz =
+    !esRolGlobal(perfil?.rol) && perfil?.unidad_id
+      ? unidades.filter((u) => u.id === perfil.unidad_id)
+      : unidades.filter((u) => u.parent_id === null).sort(sortByName);
 
   return (
     <div className="space-y-6 max-w-5xl">

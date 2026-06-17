@@ -197,3 +197,22 @@ export function calcularAvancePorIndicadores(
   const estado: EstadoSemaforo = avg >= 70 ? "verde" : avg >= 40 ? "amarillo" : "rojo";
   return { porcentaje: avg, conDatos: cnt, total, estado };
 }
+
+// Devuelve el subárbol de unidades (raíz + descendientes) a partir de un id.
+// Si rootId es null, devuelve todas. Útil para acotar filtros al área del usuario.
+export function subtreeUnidades<T extends { id: string; parent_id: string | null }>(
+  unidades: T[],
+  rootId: string | null
+): T[] {
+  if (!rootId) return unidades;
+  const hijos = (id: string): string[] => {
+    const directos = unidades.filter((u) => u.parent_id === id).map((u) => u.id);
+    return [id, ...directos.flatMap((d) => hijos(d))];
+  };
+  const ids = new Set(hijos(rootId));
+  return unidades.filter((u) => ids.has(u.id));
+}
+
+export function esRolGlobal(rol: string | null | undefined): boolean {
+  return rol === "intendenta" || rol === "admin_funcional" || rol === "admin_tecnico" || rol == null;
+}

@@ -8,6 +8,7 @@ import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatFecha, calcularAvancePorIndicadores } from "@/lib/utils";
+import { getPerfilActual } from "@/lib/auth";
 import type { EstadoSemaforo, Meta, Indicador, UnidadOrganizacional } from "@/types/database";
 import { Suspense } from "react";
 import Link from "next/link";
@@ -24,13 +25,24 @@ export default async function DashboardPage({ searchParams }: Props) {
   const resumen = await getResumenDashboard(periodo.id);
   const unidades = await getUnidades();
   const indicadores = await getIndicadores();
+  const perfil = await getPerfilActual();
 
-  // Aplicar scope (filtra todo el dashboard por una rama del organigrama)
-  const scopeId = params.scope;
+  // Roles con acceso global pueden elegir el ámbito libremente.
+  // El resto (secretario/subsec/director) queda fijado a su área.
+  const esGlobal =
+    !perfil ||
+    perfil.rol === "intendenta" ||
+    perfil.rol === "admin_funcional" ||
+    perfil.rol === "admin_tecnico";
+
   const descendientes = (id: string): string[] => {
     const directos = unidades.filter((u) => u.parent_id === id).map((u) => u.id);
     return [id, ...directos.flatMap((d) => descendientes(d))];
   };
+
+  // Si el usuario tiene área asignada y no es global, forzamos el scope a su unidad
+  const scopeForzado = !esGlobal && perfil?.unidad_id ? perfil.unidad_id : null;
+  const scopeId = scopeForzado ?? params.scope;
   const scopeUnidadIds = scopeId ? new Set(descendientes(scopeId)) : null;
 
   const proyectosScope = scopeUnidadIds
@@ -141,9 +153,17 @@ export default async function DashboardPage({ searchParams }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">Panel Ejecutivo</h1>
-          <Suspense><ScopeSelector unidades={unidades} /></Suspense>
-          {scopeUnidad && (
-            <p className="mt-1 text-xs text-muted">Ámbito: {scopeUnidad.nombre}</p>
+          {esGlobal ? (
+            <>
+              <Suspense><ScopeSelector unidades={unidades} /></Suspense>
+              {scopeUnidad && (
+                <p className="mt-1 text-xs text-muted">Ámbito: {scopeUnidad.nombre}</p>
+              )}
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted">
+              {scopeUnidad ? scopeUnidad.nombre : "Tu área"}
+            </p>
           )}
         </div>
         <div className="flex flex-col items-end gap-2 self-start">

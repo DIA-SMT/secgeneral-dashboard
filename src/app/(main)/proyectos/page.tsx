@@ -1,7 +1,7 @@
 import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores } from "@/lib/queries";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { calcularAvancePorIndicadores } from "@/lib/utils";
+import { calcularAvancePorIndicadores, esRolGlobal, subtreeUnidades } from "@/lib/utils";
 import type { Meta, UnidadOrganizacional, Indicador } from "@/types/database";
 import { ProyectosSearch } from "./search";
 import { PoaTree, type PoaIndicador, type PoaMeta, type PoaProyecto } from "@/components/poa/poa-tree";
@@ -168,7 +168,11 @@ export default async function ProyectosPage({ searchParams }: Props) {
           </p>
         </div>
         <Suspense>
-          <ProyectosSearch unidades={unidades} />
+          <ProyectosSearch
+            unidades={
+              esRolGlobal(perfil?.rol) ? unidades : subtreeUnidades(unidades, perfil?.unidad_id ?? null)
+            }
+          />
         </Suspense>
       </div>
 

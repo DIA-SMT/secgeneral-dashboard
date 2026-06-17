@@ -2,6 +2,8 @@ import { getIndicadores, getUnidades, getPeriodoActivo, getProyectos } from "@/l
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IndicadoresFiltros } from "@/components/indicadores/indicadores-filtros";
+import { getPerfilActual } from "@/lib/auth";
+import { esRolGlobal, subtreeUnidades } from "@/lib/utils";
 import type { Indicador, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -28,6 +30,10 @@ export default async function IndicadoresPage({ searchParams }: Props) {
     getUnidades(),
   ]);
   const proyectos = await getProyectos(periodo.id);
+  const perfil = await getPerfilActual();
+  const unidadesFiltro = esRolGlobal(perfil?.rol)
+    ? unidades
+    : subtreeUnidades(unidades, perfil?.unidad_id ?? null);
   const proyectoUnidad = new Map(proyectos.map((p) => [p.id, p.unidad]));
   const unidadById = new Map(unidades.map((u) => [u.id, u]));
 
@@ -115,7 +121,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
           </p>
         </div>
         <Suspense>
-          <IndicadoresFiltros unidades={unidades} />
+          <IndicadoresFiltros unidades={unidadesFiltro} />
         </Suspense>
       </div>
 

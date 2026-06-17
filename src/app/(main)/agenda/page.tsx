@@ -1,4 +1,6 @@
 import { getUnidades, getAgendasSemana, lunesDeSemana } from "@/lib/queries";
+import { getPerfilActual } from "@/lib/auth";
+import { esRolGlobal } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarioMes } from "@/components/agenda/calendario-mes";
@@ -13,7 +15,12 @@ interface Props {
 export default async function AgendaPage({ searchParams }: Props) {
   const params = await searchParams;
   const fechaLunes = params.semana ?? lunesDeSemana();
-  const [unidades, agendas] = await Promise.all([getUnidades(), getAgendasSemana(fechaLunes)]);
+  const [unidades, agendas, perfil] = await Promise.all([
+    getUnidades(),
+    getAgendasSemana(fechaLunes),
+    getPerfilActual(),
+  ]);
+  const esGlobal = esRolGlobal(perfil?.rol);
 
   const sortByName = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>
     (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre);
@@ -82,6 +89,34 @@ export default async function AgendaPage({ searchParams }: Props) {
       </Link>
     );
   };
+
+  // Vista acotada: usuarios con área asignada ven solo la agenda de su unidad
+  if (!esGlobal && perfil?.unidad_id) {
+    const miUnidad = unidadById.get(perfil.unidad_id);
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Agenda Semanal</h1>
+            <p className="text-sm text-muted mt-1">
+              {miUnidad?.nombre ?? "Mi área"} · semana del {fechaLegible}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={`/agenda?semana=${prevIso}`} className="text-xs text-muted hover:text-foreground border border-border rounded-lg px-3 py-1.5">←</Link>
+            <Suspense><CalendarioMes semanaActual={fechaLunes} /></Suspense>
+            <Link href={`/agenda?semana=${nextIso}`} className="text-xs text-muted hover:text-foreground border border-border rounded-lg px-3 py-1.5">→</Link>
+            <Link href={`/agenda/cargar?semana=${fechaLunes}`} className="text-xs text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 rounded-lg px-3 py-1.5">+ Cargar agenda</Link>
+          </div>
+        </div>
+        {miUnidad ? (
+          <div className="max-w-sm"><FichaCard unidad={miUnidad} /></div>
+        ) : (
+          <p className="text-sm text-muted">Tu perfil no tiene un área asignada.</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
