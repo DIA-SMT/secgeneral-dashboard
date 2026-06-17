@@ -379,6 +379,47 @@ export async function desactivarPerfil(user_id: string) {
 // (cuando un admin creó el usuario en Supabase Dashboard y necesita
 // asignarle rol + unidad)
 // -------------------------------------------------------
+// -------------------------------------------------------
+// Server Action: Crear un usuario en Supabase Auth (email + password)
+// Solo admin_funcional / admin_tecnico. El usuario queda SIN perfil
+// (rol/unidad) — se asigna después desde "Usuarios sin asignar".
+// -------------------------------------------------------
+export async function crearUsuarioAuth(input: { email: string; password: string }) {
+  try {
+    await requireRol("admin_funcional", "admin_tecnico");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  const email = input.email.trim().toLowerCase();
+  const password = input.password;
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Email inválido." };
+  }
+  if (!password || password.length < 6) {
+    return { success: false, error: "La contraseña debe tener al menos 6 caracteres." };
+  }
+
+  const { getSupabaseAdmin } = await import("./supabase/admin");
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (error) {
+    // Mensaje más claro para el caso típico de duplicado
+    const msg = /already.*registered|exists/i.test(error.message)
+      ? "Ya existe un usuario con ese email."
+      : error.message;
+    return { success: false, error: msg };
+  }
+
+  revalidatePath("/admin/usuarios");
+  return { success: true };
+}
+
 export async function crearPerfilParaUsuario(input: {
   user_id: string;
   email: string;

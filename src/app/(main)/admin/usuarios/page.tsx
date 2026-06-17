@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { UsuariosTable } from "@/components/admin/usuarios-table";
 import { UsuariosSinAsignar } from "@/components/admin/usuarios-sin-asignar";
+import { CrearUsuarioForm } from "@/components/admin/crear-usuario-form";
 import type { PerfilUsuario, UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
@@ -72,6 +73,8 @@ export default async function AdminUsuariosPage() {
           {huerfanos.length > 0 && ` · ${huerfanos.length} sin asignar`}
         </p>
       </div>
+
+      <CrearUsuarioForm />
 
       {huerfanos.length > 0 && (
         <UsuariosSinAsignar usuarios={huerfanos} unidades={unidades} />
