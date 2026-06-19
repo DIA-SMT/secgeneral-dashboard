@@ -5,6 +5,7 @@ import { calcularAvancePorIndicadores, esRolGlobal, subtreeUnidades } from "@/li
 import type { Meta, UnidadOrganizacional, Indicador } from "@/types/database";
 import { ProyectosSearch } from "./search";
 import { PoaTree, type PoaIndicador, type PoaMeta, type PoaProyecto } from "@/components/poa/poa-tree";
+import { NuevoProyectoForm } from "@/components/poa/nuevo-proyecto-form";
 import { Suspense } from "react";
 
 export const revalidate = 0;
@@ -175,6 +176,26 @@ export default async function ProyectosPage({ searchParams }: Props) {
           />
         </Suspense>
       </div>
+
+      {(perfil?.rol === "director" || perfil?.rol === "admin_funcional") && (
+        <div className="flex justify-end">
+          <NuevoProyectoForm
+            esAdmin={perfil.rol === "admin_funcional"}
+            unidadNombre={
+              perfil.rol === "director"
+                ? unidadById.get(perfil.unidad_id ?? "")?.nombre ?? null
+                : null
+            }
+            direcciones={
+              perfil.rol === "admin_funcional"
+                ? unidades.filter((u) => u.nivel >= 2).sort((a, b) =>
+                    (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre)
+                  )
+                : []
+            }
+          />
+        </div>
+      )}
 
       <PoaTree arbol={arbol} autoExpand={!!(params.dir || params.q || (params.estado && params.estado !== "todos"))} />
     </div>

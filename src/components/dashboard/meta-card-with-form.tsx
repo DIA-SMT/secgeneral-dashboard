@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { Meta, Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { calcularPorcentajeMeta, semaforoTextColor, formatFecha, formatFechaRelativa } from "@/lib/utils";
 import { AvanceForm } from "./avance-form";
 import { IndicadoresPanel } from "@/components/indicadores/indicador-mini-form";
+import { editarMeta, eliminarMeta } from "@/lib/actions";
 
 interface MetaCardWithFormProps {
   meta: Meta;
@@ -17,9 +18,81 @@ interface MetaCardWithFormProps {
 
 export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCargar = false }: MetaCardWithFormProps) {
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [nombreEdit, setNombreEdit] = useState(meta.nombre);
+  const [unidadEdit, setUnidadEdit] = useState(meta.unidad_medida ?? "");
+  const [metaEdit, setMetaEdit] = useState(meta.valor_meta?.toString() ?? "");
+  const [isPending, startTransition] = useTransition();
+  const [editError, setEditError] = useState<string | null>(null);
   const pct = calcularPorcentajeMeta(meta);
   const invertida = (meta.metadata as Record<string, unknown>)?.invertida === true;
   const metaTieneSeg = meta.ultima_actualizacion != null;
+
+  const guardarEdicion = () => {
+    setEditError(null);
+    startTransition(async () => {
+      const r = await editarMeta({
+        meta_id: meta.id,
+        proyecto_id: proyectoId,
+        nombre: nombreEdit,
+        unidad_medida: unidadEdit || null,
+        valor_meta: metaEdit.trim() !== "" && isFinite(Number(metaEdit)) ? Number(metaEdit) : null,
+      });
+      if (r.success) setEditing(false);
+      else setEditError(r.error ?? "Error");
+    });
+  };
+
+  const borrar = () => {
+    if (!confirm(`¿Eliminar la meta "${meta.nombre}"?`)) return;
+    startTransition(async () => {
+      await eliminarMeta({ meta_id: meta.id, proyecto_id: proyectoId });
+    });
+  };
+
+  if (editing) {
+    return (
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+        <p className="text-[10px] text-muted uppercase tracking-wider">Editar meta</p>
+        <textarea
+          value={nombreEdit}
+          onChange={(e) => setNombreEdit(e.target.value)}
+          rows={2}
+          className="w-full text-sm bg-background border border-border rounded px-2 py-1.5 text-foreground"
+          placeholder="Enunciado de la meta"
+        />
+        <div className="flex gap-2">
+          <input
+            value={unidadEdit}
+            onChange={(e) => setUnidadEdit(e.target.value)}
+            placeholder="Unidad (%, días…)"
+            className="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground"
+          />
+          <input
+            type="number"
+            step="any"
+            value={metaEdit}
+            onChange={(e) => setMetaEdit(e.target.value)}
+            placeholder="Valor objetivo"
+            className="w-32 text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground"
+          />
+        </div>
+        {editError && <p className="text-xs text-danger">{editError}</p>}
+        <div className="flex gap-2">
+          <button
+            onClick={guardarEdicion}
+            disabled={isPending}
+            className="text-xs bg-primary text-white rounded px-3 py-1.5 hover:bg-primary/90 disabled:opacity-50"
+          >
+            {isPending ? "Guardando..." : "Guardar"}
+          </button>
+          <button onClick={() => setEditing(false)} className="text-xs text-muted hover:text-foreground">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
@@ -32,6 +105,16 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
             </span>
             {invertida && (
               <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">↓ menor es mejor</span>
+            )}
+            {puedeCargar && (
+              <span className="ml-auto flex items-center gap-2">
+                <button onClick={() => setEditing(true)} className="text-[10px] text-primary hover:text-primary-light">
+                  ✎ Editar
+                </button>
+                <button onClick={borrar} disabled={isPending} className="text-[10px] text-danger hover:text-danger/80 disabled:opacity-50">
+                  ✕ Eliminar
+                </button>
+              </span>
             )}
           </div>
           <h3 className="text-sm font-semibold text-foreground">{meta.nombre}</h3>

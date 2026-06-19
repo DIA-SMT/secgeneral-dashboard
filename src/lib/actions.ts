@@ -866,3 +866,123 @@ export async function eliminarFichaPrisma(id: string) {
   revalidatePath("/poa-2027/mis-fichas");
   return { success: true };
 }
+
+// -------------------------------------------------------
+// Server Actions: Proyectos y Metas (Director / admin_funcional)
+// -------------------------------------------------------
+export async function crearProyecto(input: {
+  nombre: string;
+  objetivo?: string | null;
+  unidad_id: string;
+  codigo?: string | null;
+}) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+    return { success: false, error: "Solo Directores o Admin Funcional pueden crear proyectos" };
+  }
+  if (!input.nombre?.trim()) return { success: false, error: "El nombre del proyecto es obligatorio" };
+
+  // Director solo puede crear en su propia dirección
+  const unidadId = perfil.rol === "director" ? perfil.unidad_id : input.unidad_id;
+  if (!unidadId) return { success: false, error: "Falta la dirección del proyecto" };
+
+  const sb = await getSupabaseServer();
+  const { data: periodo } = await sb.from("periodo").select("id").eq("activo", true).single();
+  if (!periodo) return { success: false, error: "No hay período activo" };
+
+  const { data, error } = await sb
+    .from("proyecto")
+    .insert({
+      nombre: input.nombre.trim(),
+      objetivo: input.objetivo?.trim() || null,
+      codigo: input.codigo?.trim() || null,
+      unidad_id: unidadId,
+      periodo_id: (periodo as { id: string }).id,
+      estado: "activo",
+    })
+    .select("id")
+    .single();
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/proyectos");
+  revalidatePath("/dashboard");
+  return { success: true, id: (data as { id: string }).id };
+}
+
+export async function crearMeta(input: {
+  proyecto_id: string;
+  nombre: string;
+  tipo_medicion?: "cuantitativo" | "cualitativo" | "hito_unico";
+  unidad_medida?: string | null;
+  valor_meta?: number | null;
+}) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+    return { success: false, error: "Sin permisos para crear metas" };
+  }
+  if (!input.nombre?.trim()) return { success: false, error: "El enunciado de la meta es obligatorio" };
+
+  const sb = await getSupabaseServer();
+  const { error } = await sb.from("meta").insert({
+    proyecto_id: input.proyecto_id,
+    nombre: input.nombre.trim(),
+    tipo_medicion: input.tipo_medicion ?? "cuantitativo",
+    unidad_medida: input.unidad_medida?.trim() || null,
+    valor_meta: input.valor_meta ?? null,
+    estado_semaforo: "sin_datos",
+  });
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/proyectos");
+  return { success: true };
+}
+
+export async function editarMeta(input: {
+  meta_id: string;
+  proyecto_id: string;
+  nombre?: string;
+  unidad_medida?: string | null;
+  valor_meta?: number | null;
+}) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+    return { success: false, error: "Sin permisos para editar metas" };
+  }
+  if (input.nombre !== undefined && !input.nombre.trim()) {
+    return { success: false, error: "El enunciado no puede quedar vacío" };
+  }
+
+  const update: Record<string, unknown> = {};
+  if (input.nombre !== undefined) update.nombre = input.nombre.trim();
+  if (input.unidad_medida !== undefined) update.unidad_medida = input.unidad_medida?.trim() || null;
+  if (input.valor_meta !== undefined) update.valor_meta = input.valor_meta;
+
+  const sb = await getSupabaseServer();
+  const { error } = await sb.from("meta").update(update).eq("id", input.meta_id);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/proyectos");
+  return { success: true };
+}
+
+export async function eliminarMeta(input: { meta_id: string; proyecto_id: string }) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+    return { success: false, error: "Sin permisos para eliminar metas" };
+  }
+  const sb = await getSupabaseServer();
+  const { error } = await sb
+    .from("meta")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", input.meta_id);
+  if (error) return { success: false, error: error.message };
+  revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/proyectos");
+  return { success: true };
+}

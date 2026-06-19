@@ -4,6 +4,7 @@ import type { Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { MetaCardWithForm } from "@/components/dashboard/meta-card-with-form";
+import { NuevaMetaForm } from "@/components/dashboard/nueva-meta-form";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
 import { getPerfilActual } from "@/lib/auth";
@@ -122,7 +123,10 @@ export default async function ProyectoDetallePage({
 
       {/* Metas (con formulario de carga inline) */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-3">Metas ({metas.length})</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-foreground">Metas ({metas.length})</h2>
+          {puedeCargar && <NuevaMetaForm proyectoId={proyecto.id} />}
+        </div>
         <div className="space-y-3">
           {metas.map((meta) => (
             <MetaCardWithForm
