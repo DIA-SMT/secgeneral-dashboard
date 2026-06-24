@@ -42,6 +42,13 @@ export interface PoaProyecto {
   puedeCargar: boolean;
 }
 
+export interface PoaDireccion {
+  unidad: UnidadOrganizacional;
+  proyectos: PoaProyecto[];
+  // Subdirecciones (nivel 3) dentro de la dirección, con sus proyectos
+  subdirecciones?: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
+}
+
 export interface PoaArbolNodo {
   unidad: UnidadOrganizacional;
   // Proyectos cuyo unidad_id es la secretaría misma (sin dirección intermedia)
@@ -49,9 +56,9 @@ export interface PoaArbolNodo {
   subs: {
     unidad: UnidadOrganizacional;
     proyectosDirectos: PoaProyecto[]; // proyectos cuyo unidad_id es la subsec misma
-    dirs: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
+    dirs: PoaDireccion[];
   }[];
-  dirsDirectas: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
+  dirsDirectas: PoaDireccion[];
 }
 
 interface Props {
@@ -87,10 +94,12 @@ export function PoaTree({ arbol, autoExpand = false }: Props) {
 }
 
 function SecretariaNode({ nodo, autoExpand }: { nodo: PoaArbolNodo; autoExpand: boolean }) {
+  const dirPys = (d: { proyectos: PoaProyecto[]; subdirecciones?: { proyectos: PoaProyecto[] }[] }) =>
+    [...d.proyectos, ...(d.subdirecciones ?? []).flatMap((s) => s.proyectos)];
   const todosProyectos = [
     ...nodo.proyectosDirectos,
-    ...nodo.dirsDirectas.flatMap((d) => d.proyectos),
-    ...nodo.subs.flatMap((s) => [...s.proyectosDirectos, ...s.dirs.flatMap((d) => d.proyectos)]),
+    ...nodo.dirsDirectas.flatMap(dirPys),
+    ...nodo.subs.flatMap((s) => [...s.proyectosDirectos, ...s.dirs.flatMap(dirPys)]),
   ];
   const totalPy = todosProyectos.length;
   if (totalPy === 0) return null;
@@ -138,12 +147,16 @@ function SubsecretariaNode({
   sub: {
     unidad: UnidadOrganizacional;
     proyectosDirectos: PoaProyecto[];
-    dirs: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
+    dirs: PoaDireccion[];
   };
   autoExpand: boolean;
 }) {
   const totalPy =
-    sub.proyectosDirectos.length + sub.dirs.reduce((acc, d) => acc + d.proyectos.length, 0);
+    sub.proyectosDirectos.length +
+    sub.dirs.reduce(
+      (acc, d) => acc + d.proyectos.length + (d.subdirecciones ?? []).reduce((a, s) => a + s.proyectos.length, 0),
+      0
+    );
   if (totalPy === 0) return null;
   return (
     <details open={autoExpand} className="rounded-lg border border-border/60 bg-background/40 ml-4">
@@ -175,10 +188,16 @@ function DireccionNode({
   dir,
   autoExpand,
 }: {
-  dir: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] };
+  dir: {
+    unidad: UnidadOrganizacional;
+    proyectos: PoaProyecto[];
+    subdirecciones?: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
+  };
   autoExpand: boolean;
 }) {
-  if (dir.proyectos.length === 0) return null;
+  const subs = dir.subdirecciones ?? [];
+  const totalSubPy = subs.reduce((acc, s) => acc + s.proyectos.length, 0);
+  if (dir.proyectos.length === 0 && totalSubPy === 0) return null;
   return (
     <details open={autoExpand} className="rounded-lg border border-border/40 bg-background/20 ml-4">
       <summary className="cursor-pointer p-2.5 hover:bg-surface-hover/30 flex items-center gap-2">
@@ -186,10 +205,40 @@ function DireccionNode({
         <p className="text-xs font-semibold text-accent uppercase tracking-wider flex-1 line-clamp-1">
           {dir.unidad.nombre_corto ?? dir.unidad.nombre}
         </p>
-        <span className="text-[10px] text-muted">{dir.proyectos.length} proy.</span>
+        <span className="text-[10px] text-muted">{dir.proyectos.length + totalSubPy} proy.</span>
       </summary>
       <div className="px-3 pb-3 space-y-1.5">
         {dir.proyectos.map((py) => (
+          <ProyectoNode key={py.id} py={py} />
+        ))}
+        {subs.map((s) => (
+          <SubdireccionNode key={s.unidad.id} sub={s} autoExpand={autoExpand} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function SubdireccionNode({
+  sub,
+  autoExpand,
+}: {
+  sub: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] };
+  autoExpand: boolean;
+}) {
+  if (sub.proyectos.length === 0) return null;
+  return (
+    <details open={autoExpand} className="rounded-md border border-border/30 bg-background/30 ml-3">
+      <summary className="cursor-pointer p-2 hover:bg-surface-hover/20 flex items-center gap-2">
+        <span className="text-muted text-xs">▸</span>
+        <span className="text-[10px] text-muted">↳</span>
+        <p className="text-[11px] font-medium text-foreground/90 flex-1 line-clamp-1">
+          {sub.unidad.nombre_corto ?? sub.unidad.nombre}
+        </p>
+        <span className="text-[10px] text-muted">{sub.proyectos.length} proy.</span>
+      </summary>
+      <div className="px-3 pb-2 space-y-1.5">
+        {sub.proyectos.map((py) => (
           <ProyectoNode key={py.id} py={py} />
         ))}
       </div>

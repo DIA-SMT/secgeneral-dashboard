@@ -137,7 +137,17 @@ export default async function ProyectosPage({ searchParams }: Props) {
     return result;
   }
 
-  // Build sec → (sub → dir → py) or (dir → py)
+  // Construye un nodo de dirección incluyendo sus subdirecciones (nivel 3)
+  const toDireccion = (d: UnidadOrganizacional) => {
+    const subdirs = (childrenByParent.get(d.id) ?? []).filter((u) => u.nivel >= 3).sort(sortByName);
+    return {
+      unidad: d,
+      proyectos: toPoaProyectos([d.id]),
+      subdirecciones: subdirs.map((sd) => ({ unidad: sd, proyectos: toPoaProyectos([sd.id]) })),
+    };
+  };
+
+  // Build sec → (sub → dir → subdir → py) o (dir → py)
   const arbol = secretarias.map((sec) => {
     const subs = (childrenByParent.get(sec.id) ?? []).filter((u) => u.nivel === 1).sort(sortByName);
     const dirsDirectas = (childrenByParent.get(sec.id) ?? []).filter((u) => u.nivel === 2).sort(sortByName);
@@ -149,16 +159,10 @@ export default async function ProyectosPage({ searchParams }: Props) {
         return {
           unidad: sub,
           proyectosDirectos: toPoaProyectos([sub.id]),
-          dirs: dirs.map((d) => ({
-            unidad: d,
-            proyectos: toPoaProyectos([d.id]),
-          })),
+          dirs: dirs.map(toDireccion),
         };
       }),
-      dirsDirectas: dirsDirectas.map((d) => ({
-        unidad: d,
-        proyectos: toPoaProyectos([d.id]),
-      })),
+      dirsDirectas: dirsDirectas.map(toDireccion),
     };
   });
 

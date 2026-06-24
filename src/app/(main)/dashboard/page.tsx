@@ -9,7 +9,7 @@ import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatFecha, calcularAvancePorIndicadores } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
-import type { EstadoSemaforo, Meta, Indicador, UnidadOrganizacional } from "@/types/database";
+import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -129,10 +129,6 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   // Agrupar por subsecretaria
   const subsecretarias = unidades.filter((u) => u.nivel === 1);
-  const direccionesPorSubsec = new Map<string, UnidadOrganizacional[]>();
-  for (const sub of subsecretarias) {
-    direccionesPorSubsec.set(sub.id, unidades.filter((u) => u.parent_id === sub.id));
-  }
 
   const scopeUnidad = scopeId ? unidades.find((u) => u.id === scopeId) ?? null : null;
 
@@ -294,8 +290,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         ) : (
           <div className="space-y-8">
             {subsecretarias.map((sub) => {
-              const dirs = direccionesPorSubsec.get(sub.id) ?? [];
-              const allUnitIds = [sub.id, ...dirs.map((d) => d.id)];
+              const allUnitIds = descendientes(sub.id);
               const pysSub = proyectosFiltrados.filter((p) => allUnitIds.includes(p.unidad_id));
               if (pysSub.length === 0) return null;
               return (
