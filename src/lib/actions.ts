@@ -552,7 +552,7 @@ export async function borrarValorIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -589,7 +589,7 @@ export async function editarIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -627,7 +627,7 @@ export async function eliminarIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -656,7 +656,7 @@ export async function crearIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -789,7 +789,7 @@ interface FichaPrismaInput {
 export async function crearFichaPrisma(input: FichaPrismaInput) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Solo los Directores pueden cargar fichas PRISMA" };
   }
   if (!perfil.unidad_id && perfil.rol === "director") {
@@ -878,7 +878,7 @@ export async function crearProyecto(input: {
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Solo Directores o Admin Funcional pueden crear proyectos" };
   }
   if (!input.nombre?.trim()) return { success: false, error: "El nombre del proyecto es obligatorio" };
@@ -919,7 +919,7 @@ export async function crearMeta(input: {
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Sin permisos para crear metas" };
   }
   if (!input.nombre?.trim()) return { success: false, error: "El enunciado de la meta es obligatorio" };
@@ -949,7 +949,7 @@ export async function editarMeta(input: {
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Sin permisos para editar metas" };
   }
   if (input.nombre !== undefined && !input.nombre.trim()) {
@@ -973,7 +973,7 @@ export async function editarMeta(input: {
 export async function eliminarMeta(input: { meta_id: string; proyecto_id: string }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Sin permisos para eliminar metas" };
   }
   const sb = await getSupabaseServer();

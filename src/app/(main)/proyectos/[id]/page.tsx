@@ -7,7 +7,7 @@ import { MetaCardWithForm } from "@/components/dashboard/meta-card-with-form";
 import { NuevaMetaForm } from "@/components/dashboard/nueva-meta-form";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
-import { getPerfilActual } from "@/lib/auth";
+import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import { formatFecha, formatFechaRelativa, calcularEstadoProyecto, calcularAvancePorIndicadores } from "@/lib/utils";
 import { MiniGauge } from "@/components/ui/mini-gauge";
 import { BackButton } from "@/components/layout/back-button";
@@ -42,10 +42,18 @@ export default async function ProyectoDetallePage({
   }
 
   const perfil = await getPerfilActual();
-  const puedeCargar =
-    !!perfil &&
-    (perfil.rol === "admin_funcional" ||
-      (perfil.rol === "director" && perfil.unidad_id === proyecto.unidad_id));
+  let puedeCargar = false;
+  if (perfil) {
+    if (perfil.rol === "admin_funcional") {
+      puedeCargar = true;
+    } else if (perfil.rol === "director") {
+      puedeCargar = perfil.unidad_id === proyecto.unidad_id;
+    } else if (perfil.rol === "secretario" || perfil.rol === "subsecretario") {
+      // Secretario/Subsec: cualquier proyecto dentro de su ámbito (descendientes)
+      const scope = await getScopeUnidades(perfil);
+      puedeCargar = scope.includes(proyecto.unidad_id);
+    }
+  }
 
   const { porcentaje: avgPct, estado: estadoGlobal, tieneSeguimiento } = calcularEstadoProyecto(metas);
   // Avance basado en indicadores cargados

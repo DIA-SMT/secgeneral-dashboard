@@ -35,7 +35,10 @@ export default async function IndicadorDetallePage({
   if (perfil) {
     if (perfil.rol === "admin_funcional") {
       puedeCargar = true;
-    } else if (perfil.rol === "director" && proyecto?.unidad_id) {
+    } else if (
+      (perfil.rol === "director" || perfil.rol === "secretario" || perfil.rol === "subsecretario") &&
+      proyecto?.unidad_id
+    ) {
       const scope = await getScopeUnidades(perfil);
       puedeCargar = scope.includes(proyecto.unidad_id);
     }

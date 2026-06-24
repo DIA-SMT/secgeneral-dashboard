@@ -90,11 +90,19 @@ export default async function AgendaPage({ searchParams }: Props) {
     );
   };
 
-  // Vista acotada: usuarios con área asignada ven solo la agenda de su unidad
+  // Vista acotada: usuarios con área asignada ven solo su ámbito.
+  // - Director → la agenda de su dirección.
+  // - Secretario / Subsecretario → las agendas de TODAS sus direcciones.
   if (!esGlobal && perfil?.unidad_id) {
     const miUnidad = unidadById.get(perfil.unidad_id);
+    const unidadesScoped =
+      perfil.rol === "director"
+        ? miUnidad
+          ? [miUnidad]
+          : []
+        : direccionesDe(perfil.unidad_id);
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-6xl">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Agenda Semanal</h1>
@@ -109,10 +117,14 @@ export default async function AgendaPage({ searchParams }: Props) {
             <Link href={`/agenda/cargar?semana=${fechaLunes}`} className="text-xs text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 rounded-lg px-3 py-1.5">+ Cargar agenda</Link>
           </div>
         </div>
-        {miUnidad ? (
-          <div className="max-w-sm"><FichaCard unidad={miUnidad} /></div>
+        {unidadesScoped.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {unidadesScoped.map((u) => (
+              <FichaCard key={u.id} unidad={u} />
+            ))}
+          </div>
         ) : (
-          <p className="text-sm text-muted">Tu perfil no tiene un área asignada.</p>
+          <p className="text-sm text-muted">No hay direcciones asociadas a tu área.</p>
         )}
       </div>
     );

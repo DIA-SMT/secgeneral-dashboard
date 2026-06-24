@@ -32,7 +32,8 @@ export default async function ProyectosPage({ searchParams }: Props) {
 
   // Perfil + scope para saber si el usuario puede cargar avances
   const perfil = await getPerfilActual();
-  const puedeCargarBase = perfil?.rol === "director" || perfil?.rol === "admin_funcional";
+  const rolesCarga = ["director", "subsecretario", "secretario", "admin_funcional"];
+  const puedeCargarBase = !!perfil && rolesCarga.includes(perfil.rol);
   const scopeUnidadesUsuario =
     puedeCargarBase && perfil ? new Set(await getScopeUnidades(perfil)) : null;
 
@@ -177,10 +178,10 @@ export default async function ProyectosPage({ searchParams }: Props) {
         </Suspense>
       </div>
 
-      {(perfil?.rol === "director" || perfil?.rol === "admin_funcional") && (
+      {puedeCargarBase && perfil && (
         <div className="flex justify-end">
           <NuevoProyectoForm
-            esAdmin={perfil.rol === "admin_funcional"}
+            esAdmin={perfil.rol !== "director"}
             unidadNombre={
               perfil.rol === "director"
                 ? unidadById.get(perfil.unidad_id ?? "")?.nombre ?? null
@@ -188,9 +189,13 @@ export default async function ProyectosPage({ searchParams }: Props) {
             }
             direcciones={
               perfil.rol === "admin_funcional"
-                ? unidades.filter((u) => u.nivel >= 2).sort((a, b) =>
-                    (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre)
-                  )
+                ? unidades
+                    .filter((u) => u.nivel >= 2)
+                    .sort((a, b) => (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre))
+                : perfil.rol === "secretario" || perfil.rol === "subsecretario"
+                ? unidades
+                    .filter((u) => u.nivel >= 2 && scopeUnidadesUsuario?.has(u.id))
+                    .sort((a, b) => (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre))
                 : []
             }
           />
