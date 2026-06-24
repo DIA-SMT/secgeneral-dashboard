@@ -44,8 +44,11 @@ export interface PoaProyecto {
 
 export interface PoaArbolNodo {
   unidad: UnidadOrganizacional;
+  // Proyectos cuyo unidad_id es la secretaría misma (sin dirección intermedia)
+  proyectosDirectos: PoaProyecto[];
   subs: {
     unidad: UnidadOrganizacional;
+    proyectosDirectos: PoaProyecto[]; // proyectos cuyo unidad_id es la subsec misma
     dirs: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
   }[];
   dirsDirectas: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
@@ -85,8 +88,9 @@ export function PoaTree({ arbol, autoExpand = false }: Props) {
 
 function SecretariaNode({ nodo, autoExpand }: { nodo: PoaArbolNodo; autoExpand: boolean }) {
   const todosProyectos = [
+    ...nodo.proyectosDirectos,
     ...nodo.dirsDirectas.flatMap((d) => d.proyectos),
-    ...nodo.subs.flatMap((s) => s.dirs.flatMap((d) => d.proyectos)),
+    ...nodo.subs.flatMap((s) => [...s.proyectosDirectos, ...s.dirs.flatMap((d) => d.proyectos)]),
   ];
   const totalPy = todosProyectos.length;
   if (totalPy === 0) return null;
@@ -108,6 +112,14 @@ function SecretariaNode({ nodo, autoExpand }: { nodo: PoaArbolNodo; autoExpand: 
         </div>
       </summary>
       <div className="px-4 pb-4 space-y-2 border-t border-border/50">
+        {/* Proyectos directamente bajo la secretaría (sin dirección) */}
+        {nodo.proyectosDirectos.length > 0 && (
+          <div className="space-y-1.5 pt-2">
+            {nodo.proyectosDirectos.map((py) => (
+              <ProyectoNode key={py.id} py={py} />
+            ))}
+          </div>
+        )}
         {nodo.subs.map((s) => (
           <SubsecretariaNode key={s.unidad.id} sub={s} autoExpand={autoExpand} />
         ))}
@@ -123,10 +135,15 @@ function SubsecretariaNode({
   sub,
   autoExpand,
 }: {
-  sub: { unidad: UnidadOrganizacional; dirs: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[] };
+  sub: {
+    unidad: UnidadOrganizacional;
+    proyectosDirectos: PoaProyecto[];
+    dirs: { unidad: UnidadOrganizacional; proyectos: PoaProyecto[] }[];
+  };
   autoExpand: boolean;
 }) {
-  const totalPy = sub.dirs.reduce((acc, d) => acc + d.proyectos.length, 0);
+  const totalPy =
+    sub.proyectosDirectos.length + sub.dirs.reduce((acc, d) => acc + d.proyectos.length, 0);
   if (totalPy === 0) return null;
   return (
     <details open={autoExpand} className="rounded-lg border border-border/60 bg-background/40 ml-4">
@@ -139,6 +156,13 @@ function SubsecretariaNode({
         <span className="text-[10px] text-muted">{totalPy} proy.</span>
       </summary>
       <div className="px-3 pb-3 space-y-1.5 border-t border-border/30">
+        {sub.proyectosDirectos.length > 0 && (
+          <div className="space-y-1.5 pt-1.5">
+            {sub.proyectosDirectos.map((py) => (
+              <ProyectoNode key={py.id} py={py} />
+            ))}
+          </div>
+        )}
         {sub.dirs.map((d) => (
           <DireccionNode key={d.unidad.id} dir={d} autoExpand={autoExpand} />
         ))}

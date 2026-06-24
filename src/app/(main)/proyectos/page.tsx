@@ -143,10 +143,12 @@ export default async function ProyectosPage({ searchParams }: Props) {
     const dirsDirectas = (childrenByParent.get(sec.id) ?? []).filter((u) => u.nivel === 2).sort(sortByName);
     return {
       unidad: sec,
+      proyectosDirectos: toPoaProyectos([sec.id]),
       subs: subs.map((sub) => {
         const dirs = (childrenByParent.get(sub.id) ?? []).filter((u) => u.nivel === 2).sort(sortByName);
         return {
           unidad: sub,
+          proyectosDirectos: toPoaProyectos([sub.id]),
           dirs: dirs.map((d) => ({
             unidad: d,
             proyectos: toPoaProyectos([d.id]),
@@ -202,7 +204,13 @@ export default async function ProyectosPage({ searchParams }: Props) {
         </div>
       )}
 
-      <PoaTree arbol={arbol} autoExpand={!!(params.dir || params.q || (params.estado && params.estado !== "todos"))} />
+      <PoaTree
+        arbol={arbol}
+        autoExpand={
+          !esRolGlobal(perfil?.rol) ||
+          !!(params.dir || params.q || (params.estado && params.estado !== "todos"))
+        }
+      />
     </div>
   );
 }
