@@ -7,8 +7,25 @@ import { getPerfilActual } from "@/lib/auth";
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY!;
 const MODEL = "anthropic/claude-sonnet-4.6";
 
+// Chatbot solo de consulta: la parte operativa (carga / validación / agenda) está
+// oculta de momento. Solo se exponen y ejecutan tools de LECTURA.
+const READ_ONLY_TOOLS = new Set<string>([
+  "buscar_proyectos",
+  "obtener_detalle_proyecto",
+  "listar_metas_pendientes",
+  "listar_hitos_proximos",
+  "obtener_resumen_area",
+  "listar_unidades",
+  "obtener_indicadores_de_meta",
+  "listar_avances_pendientes_validacion",
+  "obtener_agenda_semana",
+]);
+
 // Tool executor
 async function executeTool(name: string, input: Record<string, unknown>): Promise<unknown> {
+  if (!READ_ONLY_TOOLS.has(name)) {
+    return { error: "Esta acción no está disponible. El asistente es solo de consulta." };
+  }
   switch (name) {
     // --- Lectura ---
     case "buscar_proyectos":
@@ -58,7 +75,9 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
 
 // Convert our tools to OpenAI function format for OpenRouter
 function toolsToOpenAI() {
-  return chatTools.map((t) => ({
+  return chatTools
+    .filter((t) => READ_ONLY_TOOLS.has(t.name))
+    .map((t) => ({
     type: "function" as const,
     function: {
       name: t.name,

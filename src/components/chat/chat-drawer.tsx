@@ -20,16 +20,10 @@ const EXECUTIVE_SUGGESTIONS = [
   "🎭 ¿Cómo está Cultura?",
 ];
 
-const OPERATIVE_SUGGESTIONS = [
-  "⏳ ¿Qué tengo que cargar esta semana?",
-  "📅 ¿Qué hitos se vienen este mes?",
-  "🔴 ¿Qué metas están pendientes de reporte?",
-  "📊 ¿Cuántos proyectos tiene mi dirección?",
-];
-
 export function ChatDrawer() {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<ChatMode>("operativo");
+  // Chatbot solo de consulta: modo ejecutivo fijo (la parte operativa está oculta).
+  const [mode] = useState<ChatMode>("ejecutivo");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -96,7 +90,7 @@ export function ChatDrawer() {
     }
   }
 
-  const suggestions = mode === "ejecutivo" ? EXECUTIVE_SUGGESTIONS : OPERATIVE_SUGGESTIONS;
+  const suggestions = EXECUTIVE_SUGGESTIONS;
 
   return (
     <>
@@ -138,29 +132,6 @@ export function ChatDrawer() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Mode toggle */}
-              <div className="flex text-[10px] border border-border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setMode("ejecutivo")}
-                  className={`px-2.5 py-1 transition-colors ${
-                    mode === "ejecutivo"
-                      ? "bg-primary/20 text-primary font-semibold"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  Ejecutivo
-                </button>
-                <button
-                  onClick={() => setMode("operativo")}
-                  className={`px-2.5 py-1 transition-colors ${
-                    mode === "operativo"
-                      ? "bg-primary/20 text-primary font-semibold"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  Operativo
-                </button>
-              </div>
               <button
                 onClick={() => setOpen(false)}
                 className="text-muted hover:text-foreground transition-colors p-1"
@@ -186,12 +157,10 @@ export function ChatDrawer() {
                     />
                   </div>
                   <p className="text-sm text-foreground font-medium">
-                    {mode === "ejecutivo" ? "Modo Ejecutivo" : "Modo Operativo"}
+                    Asistente de consulta
                   </p>
                   <p className="text-xs text-muted mt-1">
-                    {mode === "ejecutivo"
-                      ? "Consultá estado, alertas y seguimiento del POA"
-                      : "Consultá pendientes, hitos y estado de tu área"}
+                    Consultá estado, alertas y seguimiento del POA
                   </p>
                 </div>
 
