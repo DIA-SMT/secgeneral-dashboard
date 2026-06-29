@@ -143,6 +143,17 @@ export default async function DashboardPage({ searchParams }: Props) {
   }
   const hayFiltros = !!scopeId || (!!params.estado && params.estado !== "todos");
 
+  // Las cards llevan a su sección arrastrando los filtros del panel:
+  // el ámbito (scope) mapeado al parámetro de cada página y el estado/semáforo.
+  const estadoParam = params.estado && params.estado !== "todos" ? params.estado : null;
+  const buildHref = (base: string, areaKey: "dir" | "unidad") => {
+    const sp = new URLSearchParams();
+    if (scopeId) sp.set(areaKey, scopeId);
+    if (estadoParam) sp.set("estado", estadoParam);
+    const qs = sp.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+
   return (
     <div className="space-y-8 max-w-7xl">
       {/* Header */}
@@ -209,13 +220,13 @@ export default async function DashboardPage({ searchParams }: Props) {
           </div>
         </div>
 
-        <Link href="/proyectos" className="block hover:scale-[1.02] transition-transform">
+        <Link href={buildHref("/proyectos", "dir")} className="block hover:scale-[1.02] transition-transform">
           <KpiCard label="Proyectos" value={proyectosActivos.length}
             sublabel={`de ${proyectosScope.length} en POA`}
             accent="success" />
         </Link>
 
-        <Link href="/metas" className="block hover:scale-[1.02] transition-transform">
+        <Link href={buildHref("/metas", "unidad")} className="block hover:scale-[1.02] transition-transform">
           <KpiCard label="Metas" value={metasScope.length}
             sublabel={resumen.tieneSeguimiento
               ? `${metasSemaforoScope.verde} finalizadas · ${metasSemaforoScope.rojo} no iniciadas`
@@ -223,7 +234,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             accent="accent" />
         </Link>
 
-        <Link href="/indicadores" className="block hover:scale-[1.02] transition-transform">
+        <Link href={buildHref("/indicadores", "unidad")} className="block hover:scale-[1.02] transition-transform">
           <KpiCard label="Indicadores" value={indicadoresStats.total}
             sublabel={indicadoresStats.total > 0
               ? `${indicadoresStats.semaforo.verde} en verde · ${indicadoresStats.semaforo.rojo} en rojo`
