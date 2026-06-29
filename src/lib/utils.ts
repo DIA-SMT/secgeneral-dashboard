@@ -39,6 +39,28 @@ export function semaforoTextColor(estado: EstadoSemaforo): string {
   return map[estado] ?? "text-muted";
 }
 
+// Estado del semáforo para mostrar en la UI. Si el indicador tiene algún dato
+// cargado, no puede figurar como "No iniciado" (rojo/sin_datos): se muestra
+// como "En ejecución" (amarillo). "Finalizado" (verde) queda como esté cargado.
+export function estadoVisualIndicador(ind: {
+  estado_semaforo: EstadoSemaforo;
+  valor_actual: number | null;
+  valor_actual_texto: string | null;
+}): EstadoSemaforo {
+  const tieneDato =
+    ind.valor_actual != null ||
+    (ind.valor_actual_texto != null && ind.valor_actual_texto.trim() !== "");
+  if (
+    tieneDato &&
+    (ind.estado_semaforo === "rojo" ||
+      ind.estado_semaforo === "sin_datos" ||
+      ind.estado_semaforo === "gris")
+  ) {
+    return "amarillo";
+  }
+  return ind.estado_semaforo;
+}
+
 export function formatFechaRelativa(fecha: string | null): string {
   if (!fecha) return "Sin fecha";
   const ahora = new Date();

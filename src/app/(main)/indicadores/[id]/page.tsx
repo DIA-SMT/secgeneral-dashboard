@@ -4,6 +4,7 @@ import { BackButton } from "@/components/layout/back-button";
 import { IndicadorCargaForm } from "@/components/indicadores/indicador-carga-form";
 import { IndicadorAccionesBar } from "@/components/indicadores/indicador-acciones-bar";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
+import { estadoVisualIndicador } from "@/lib/utils";
 import type { Indicador, Meta, Proyecto, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -74,7 +75,7 @@ export default async function IndicadorDetallePage({
         <div className="flex items-start justify-between gap-4 mb-3">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <StatusBadge estado={ind.estado_semaforo} />
+              <StatusBadge estado={estadoVisualIndicador(ind)} />
               {ind.codigo && (
                 <span className="text-xs font-mono text-muted bg-border/50 px-2 py-0.5 rounded">{ind.codigo}</span>
               )}

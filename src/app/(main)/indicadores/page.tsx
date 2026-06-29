@@ -3,35 +3,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IndicadoresFiltros } from "@/components/indicadores/indicadores-filtros";
 import { getPerfilActual } from "@/lib/auth";
-import { esRolGlobal, subtreeUnidades } from "@/lib/utils";
-import type { Indicador, UnidadOrganizacional, EstadoSemaforo } from "@/types/database";
+import { esRolGlobal, subtreeUnidades, estadoVisualIndicador } from "@/lib/utils";
+import type { Indicador, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 import { Suspense } from "react";
 
 export const revalidate = 0;
-
-// El badge debe reflejar el ciclo de vida real: si el indicador tiene algún
-// dato cargado, no puede figurar como "No iniciado" (rojo/sin_datos). En ese
-// caso lo mostramos como "En ejecución" (amarillo). "Finalizado" (verde) queda
-// como esté cargado.
-function estadoVisualIndicador(ind: {
-  estado_semaforo: EstadoSemaforo;
-  valor_actual: number | null;
-  valor_actual_texto: string | null;
-}): EstadoSemaforo {
-  const tieneDato =
-    ind.valor_actual != null ||
-    (ind.valor_actual_texto != null && ind.valor_actual_texto.trim() !== "");
-  if (
-    tieneDato &&
-    (ind.estado_semaforo === "rojo" ||
-      ind.estado_semaforo === "sin_datos" ||
-      ind.estado_semaforo === "gris")
-  ) {
-    return "amarillo";
-  }
-  return ind.estado_semaforo;
-}
 
 interface Props {
   searchParams: Promise<{ q?: string; estado?: string; unidad?: string }>;
