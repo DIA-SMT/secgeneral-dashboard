@@ -4,11 +4,34 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { IndicadoresFiltros } from "@/components/indicadores/indicadores-filtros";
 import { getPerfilActual } from "@/lib/auth";
 import { esRolGlobal, subtreeUnidades } from "@/lib/utils";
-import type { Indicador, UnidadOrganizacional } from "@/types/database";
+import type { Indicador, UnidadOrganizacional, EstadoSemaforo } from "@/types/database";
 import Link from "next/link";
 import { Suspense } from "react";
 
 export const revalidate = 0;
+
+// El badge debe reflejar el ciclo de vida real: si el indicador tiene algún
+// dato cargado, no puede figurar como "No iniciado" (rojo/sin_datos). En ese
+// caso lo mostramos como "En ejecución" (amarillo). "Finalizado" (verde) queda
+// como esté cargado.
+function estadoVisualIndicador(ind: {
+  estado_semaforo: EstadoSemaforo;
+  valor_actual: number | null;
+  valor_actual_texto: string | null;
+}): EstadoSemaforo {
+  const tieneDato =
+    ind.valor_actual != null ||
+    (ind.valor_actual_texto != null && ind.valor_actual_texto.trim() !== "");
+  if (
+    tieneDato &&
+    (ind.estado_semaforo === "rojo" ||
+      ind.estado_semaforo === "sin_datos" ||
+      ind.estado_semaforo === "gris")
+  ) {
+    return "amarillo";
+  }
+  return ind.estado_semaforo;
+}
 
 interface Props {
   searchParams: Promise<{ q?: string; estado?: string; unidad?: string }>;
@@ -56,7 +79,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
     );
   }
   if (params.estado && params.estado !== "todos") {
-    filtrados = filtrados.filter((i) => i.estado_semaforo === params.estado);
+    filtrados = filtrados.filter((i) => estadoVisualIndicador(i) === params.estado);
   }
   if (params.unidad) {
     const descendientes = (id: string): string[] => {
@@ -163,7 +186,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
                           className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-surface hover:bg-surface-hover hover:border-primary/30 transition-all group"
                         >
                           <div className="w-16 shrink-0">
-                            <StatusBadge estado={ind.estado_semaforo} />
+                            <StatusBadge estado={estadoVisualIndicador(ind)} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -186,6 +209,10 @@ export default async function IndicadoresPage({ searchParams }: Props) {
                             {ind.valor_actual != null && ind.valor_objetivo != null ? (
                               <p className="font-semibold text-foreground">
                                 {ind.valor_actual} / {ind.valor_objetivo} {ind.unidad_medida ?? ""}
+                              </p>
+                            ) : ind.valor_actual_texto || ind.valor_objetivo_texto ? (
+                              <p className="font-semibold text-foreground">
+                                {ind.valor_actual_texto ?? "—"} / {ind.valor_objetivo_texto ?? "—"} {ind.unidad_medida ?? ""}
                               </p>
                             ) : (
                               <span className="text-[10px] text-muted">—</span>
