@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase/server";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // -------------------------------------------------------
@@ -11,6 +12,7 @@ export async function buscarProyectos(params: {
   texto?: string;
   solo_sin_seguimiento?: boolean;
 }) {
+  const supabase = await getSupabaseServer();
   const periodo = await getPeriodoActivoId();
 
   let query = supabase
@@ -68,6 +70,7 @@ export async function buscarProyectos(params: {
 }
 
 export async function obtenerDetalleProyecto(params: { proyecto_id: string }) {
+  const supabase = await getSupabaseServer();
   const { data: py } = await supabase
     .from("proyecto")
     .select("*, unidad:unidad_organizacional(nombre_corto, nombre)")
@@ -123,6 +126,7 @@ export async function listarMetasPendientes(params: {
   unidad_id?: string;
   dias_sin_actualizar?: number;
 }) {
+  const supabase = await getSupabaseServer();
   const periodo = await getPeriodoActivoId();
   const dias = params.dias_sin_actualizar ?? 14;
   const corte = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
@@ -191,6 +195,7 @@ export async function listarHitosProximos(params: {
   unidad_id?: string;
   incluir_vencidos?: boolean;
 }) {
+  const supabase = await getSupabaseServer();
   const periodo = await getPeriodoActivoId();
   const dias = params.dias ?? 30;
   const ahora = new Date();
@@ -248,6 +253,7 @@ export async function listarHitosProximos(params: {
 }
 
 export async function obtenerResumenArea(params: { unidad_id: string }) {
+  const supabase = await getSupabaseServer();
   const periodo = await getPeriodoActivoId();
 
   const { data: unidad } = await supabase
@@ -310,6 +316,7 @@ export async function obtenerResumenArea(params: { unidad_id: string }) {
 }
 
 export async function listarUnidades() {
+  const supabase = await getSupabaseServer();
   const { data } = await supabase
     .from("unidad_organizacional")
     .select("id, nombre, nombre_corto, tipo, nivel, responsable_nombre")
@@ -608,6 +615,7 @@ export async function cancelarPropuesta(params: { propuesta_id: string }) {
 
 // Helper
 async function getPeriodoActivoId(): Promise<string> {
+  const supabase = await getSupabaseServer();
   const { data } = await supabase
     .from("periodo")
     .select("id")
@@ -621,6 +629,7 @@ async function getPeriodoActivoId(): Promise<string> {
 // =============================================================
 
 export async function obtenerIndicadoresDeMeta(params: { meta_id: string }) {
+  const supabase = await getSupabaseServer();
   const { data: meta } = await supabase
     .from("meta")
     .select("id, nombre")
@@ -706,6 +715,7 @@ export async function actualizarIndicador(params: {
 export async function listarAvancesPendientesValidacion(params: {
   unidad_id?: string;
 }) {
+  const supabase = await getSupabaseServer();
   let pyQuery = supabase
     .from("proyecto")
     .select("id, nombre, codigo, unidad_id")
@@ -793,6 +803,7 @@ export async function obtenerAgendaSemana(params: {
   unidad_id: string;
   fecha_lunes?: string;
 }) {
+  const supabase = await getSupabaseServer();
   const fechaLunes = params.fecha_lunes ?? lunesDeSemana();
 
   const { data: sem } = await supabase
