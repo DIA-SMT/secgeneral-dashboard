@@ -1,9 +1,8 @@
-import { getPeriodoActivo, getProyectos, getUnidades } from "@/lib/queries";
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getPeriodoActivo, getProyectos, getUnidades, getMetasDelPeriodo } from "@/lib/queries";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { calcularPorcentajeMeta } from "@/lib/utils";
-import type { Meta, UnidadOrganizacional } from "@/types/database";
+import type { UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 
 export const revalidate = 60;
@@ -20,15 +19,8 @@ export default async function MetasPage({ searchParams }: Props) {
   ]);
   const periodoProyectos = await getProyectos(periodo.id);
 
-  const supabase = await getSupabaseServer();
-  const { data: metasData } = await supabase
-    .from("meta")
-    .select("*")
-    .in("proyecto_id", periodoProyectos.map((p) => p.id))
-    .is("deleted_at", null);
-
   const proyectosMap = new Map(periodoProyectos.map((p) => [p.id, p]));
-  let metas = (metasData ?? []) as Meta[];
+  let metas = await getMetasDelPeriodo(periodo.id);
 
   if (params.q) {
     const q = params.q.toLowerCase();

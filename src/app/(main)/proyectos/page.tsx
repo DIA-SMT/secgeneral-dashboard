@@ -1,5 +1,4 @@
-import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores } from "@/lib/queries";
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores, getMetasDelPeriodo } from "@/lib/queries";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import { calcularAvancePorIndicadores, esRolGlobal, subtreeUnidades } from "@/lib/utils";
 import type { Meta, UnidadOrganizacional, Indicador } from "@/types/database";
@@ -23,12 +22,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
     getIndicadores(),
   ]);
 
-  const supabase = await getSupabaseServer();
-  const { data: todasMetas } = await supabase
-    .from("meta")
-    .select("*")
-    .in("proyecto_id", proyectos.map((p) => p.id))
-    .is("deleted_at", null);
+  const todasMetas = await getMetasDelPeriodo(periodo.id);
 
   // Perfil + scope para saber si el usuario puede cargar avances
   const perfil = await getPerfilActual();

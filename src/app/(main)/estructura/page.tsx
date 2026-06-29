@@ -1,5 +1,4 @@
-import { getUnidades, getPeriodoActivo, getProyectos } from "@/lib/queries";
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getUnidades, getPeriodoActivo, getProyectos, getMetasDelPeriodo } from "@/lib/queries";
 import { getPerfilActual } from "@/lib/auth";
 import { esRolGlobal } from "@/lib/utils";
 import type { EstadoSemaforo } from "@/types/database";
@@ -15,12 +14,7 @@ export default async function EstructuraPage() {
   ]);
   const proyectos = await getProyectos(periodo.id);
 
-  const supabase = await getSupabaseServer();
-  const { data: todasMetas } = await supabase
-    .from("meta")
-    .select("proyecto_id, estado_semaforo")
-    .in("proyecto_id", proyectos.map((p) => p.id))
-    .is("deleted_at", null);
+  const todasMetas = await getMetasDelPeriodo(periodo.id);
 
   const pyPorUnidad: Record<string, { id: string; nombre: string; codigo: string | null }[]> = {};
   for (const py of proyectos) {

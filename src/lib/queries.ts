@@ -208,19 +208,35 @@ export async function getIndicadoresPorMeta(metaId: string): Promise<Indicador[]
   return (data ?? []) as Indicador[];
 }
 
+// Todas las metas (no borradas) de un período. Filtra vía join inverso a
+// proyecto en vez de mandar cientos de UUIDs en la URL (que dispara
+// HeadersOverflowError cuando hay muchos proyectos). Paginado para no truncar.
+export async function getMetasDelPeriodo(periodoId: string): Promise<Meta[]> {
+  const supabase = await getSupabaseServer();
+  const metas: Meta[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("meta")
+      .select("*, proyecto:proyecto!inner(id, periodo_id)")
+      .eq("proyecto.periodo_id", periodoId)
+      .is("deleted_at", null)
+      .order("id")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as Meta[];
+    metas.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  return metas;
+}
+
 export async function getResumenDashboard(periodoId: string) {
   const supabase = await getSupabaseServer();
   const proyectos = await getProyectos(periodoId);
-  const proyectoIds = proyectos.map((p) => p.id);
-
-  const { data: metasData, error: metasError } = await supabase
-    .from("meta")
-    .select("*")
-    .in("proyecto_id", proyectoIds)
-    .is("deleted_at", null);
-  if (metasError) throw metasError;
-
-  const metas = (metasData ?? []) as Meta[];
+  const metas = await getMetasDelPeriodo(periodoId);
 
   // Indicadores: count vía join inverso (evita mandar 700+ UUIDs en la URL)
   let totalIndicadores = 0;
@@ -247,14 +263,26 @@ export async function getResumenDashboard(periodoId: string) {
     });
   }
 
-  const { data: hitosData, error: hitosError } = await supabase
-    .from("hito")
-    .select("*")
-    .in("proyecto_id", proyectoIds)
-    .is("deleted_at", null);
-  if (hitosError) throw hitosError;
-
-  const hitos = (hitosData ?? []) as Hito[];
+  // Hitos del período vía join inverso (mismo motivo que metas).
+  const hitos: Hito[] = [];
+  {
+    const pageSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("hito")
+        .select("*, proyecto:proyecto!inner(id, periodo_id)")
+        .eq("proyecto.periodo_id", periodoId)
+        .is("deleted_at", null)
+        .order("id")
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const batch = (data ?? []) as Hito[];
+      hitos.push(...batch);
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+  }
 
   const metasPorProyecto = new Map<string, Meta[]>();
   for (const m of metas) {
