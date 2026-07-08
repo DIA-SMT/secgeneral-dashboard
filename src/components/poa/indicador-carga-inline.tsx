@@ -41,8 +41,15 @@ export function IndicadorCargaInline({
   const submit = () => {
     setError(null);
     if (modo === "numerico") {
-      const num = Number(valor);
-      if (!isFinite(num)) {
+      const valorT = valor.trim();
+      const objT = obj.trim();
+      if (valorT === "" && objT === "") {
+        setError("Ingresá un valor y/o un objetivo");
+        return;
+      }
+      // Campo vacío ⇒ null (no 0), para no marcar avance inexistente.
+      const num = valorT === "" ? null : Number(valorT);
+      if (num != null && !isFinite(num)) {
         setError("Número inválido (sin signo %)");
         return;
       }
@@ -51,7 +58,7 @@ export function IndicadorCargaInline({
           indicador_id: indicadorId,
           valor_actual: num,
           valor_actual_texto: null,
-          valor_objetivo: obj.trim() !== "" && isFinite(Number(obj)) ? Number(obj) : null,
+          valor_objetivo: objT !== "" && isFinite(Number(objT)) ? Number(objT) : null,
           valor_objetivo_texto: null,
           unidad_medida: unidad || null,
           proyecto_id: proyectoId,

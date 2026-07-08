@@ -220,6 +220,21 @@ export function calcularAvancePorIndicadores(
   return { porcentaje: avg, conDatos: cnt, total, estado };
 }
 
+// Avance global a partir de la CANTIDAD de proyectos por estado (no del avance
+// individual de cada uno): finalizado = 100 %, en ejecución = 50 %, sobre el
+// total de proyectos (los "sin datos" cuentan como 0 %). Devuelve null si el
+// conjunto está vacío.
+export function avanceGlobalPorEstado(dist: {
+  verde: number;
+  amarillo: number;
+  rojo: number;
+  sin_datos: number;
+}): number | null {
+  const total = dist.verde + dist.amarillo + dist.rojo + dist.sin_datos;
+  if (total === 0) return null;
+  return Math.round((dist.verde * 100 + dist.amarillo * 50) / total);
+}
+
 // Devuelve el subárbol de unidades (raíz + descendientes) a partir de un id.
 // Si rootId es null, devuelve todas. Útil para acotar filtros al área del usuario.
 export function subtreeUnidades<T extends { id: string; parent_id: string | null }>(

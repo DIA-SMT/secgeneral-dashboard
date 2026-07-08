@@ -7,7 +7,7 @@ import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatFecha, calcularAvancePorIndicadores } from "@/lib/utils";
+import { formatFecha, calcularAvancePorIndicadores, avanceGlobalPorEstado } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
 import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
 import { Suspense } from "react";
@@ -100,24 +100,37 @@ export default async function DashboardPage({ searchParams }: Props) {
     avancePorProyecto.set(py.id, calcularAvancePorIndicadores(indByProyecto.get(py.id) ?? []));
   }
 
-  // Avance global = promedio de proyectos con datos
-  const proyectosConDatos = proyectosActivos.filter((p) => (avancePorProyecto.get(p.id)?.conDatos ?? 0) > 0);
-  const porcentajeGlobal =
-    proyectosConDatos.length > 0
-      ? Math.round(
-          proyectosConDatos.reduce((acc, p) => acc + (avancePorProyecto.get(p.id)?.porcentaje ?? 0), 0) /
-            proyectosConDatos.length
-        )
-      : null;
-  const tieneSeguimiento = proyectosConDatos.length > 0;
-
-  // Distribución de proyectos por estado (semáforo) según sus indicadores
-  const distribucionProyectos = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
-  for (const py of proyectosActivos) {
+  // Estado (semáforo) de un proyecto según sus indicadores
+  type EstadoProyecto = "verde" | "amarillo" | "rojo" | "sin_datos";
+  const estadoProyecto = (py: { id: string }): EstadoProyecto => {
     const av = avancePorProyecto.get(py.id);
-    if (!av || av.conDatos === 0) distribucionProyectos.sin_datos++;
-    else distribucionProyectos[av.estado as "verde" | "amarillo" | "rojo"]++;
+    if (!av || av.conDatos === 0) return "sin_datos";
+    return av.estado as "verde" | "amarillo" | "rojo";
+  };
+
+  // Distribución (conteo) de proyectos por estado, para un conjunto dado
+  const distribucion = (pys: typeof proyectosActivos) => {
+    const d = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
+    for (const py of pys) d[estadoProyecto(py)]++;
+    return d;
+  };
+
+  // Distribución del ámbito completo (tarjeta "Grado de avance")
+  const distribucionProyectos = distribucion(proyectosActivos);
+
+  // Filtro por estado (semáforo). El ámbito ya está aplicado en proyectosActivos.
+  let proyectosFiltrados = proyectosActivos;
+  if (params.estado && params.estado !== "todos") {
+    proyectosFiltrados = proyectosActivos.filter((py) => estadoProyecto(py) === params.estado);
   }
+
+  // Avance global ponderado por CANTIDAD de proyectos por estado (finalizado
+  // 100 %, en ejecución 50 %), recalculado sobre el conjunto filtrado.
+  const distribucionGlobal = distribucion(proyectosFiltrados);
+  const porcentajeGlobal = avanceGlobalPorEstado(distribucionGlobal);
+  // Hay seguimiento si al menos un proyecto del conjunto tiene datos cargados.
+  const tieneSeguimiento =
+    distribucionGlobal.verde + distribucionGlobal.amarillo + distribucionGlobal.rojo > 0;
 
   const estadoGlobal: EstadoSemaforo = !tieneSeguimiento
     ? "sin_datos"
@@ -132,15 +145,6 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const scopeUnidad = scopeId ? unidades.find((u) => u.id === scopeId) ?? null : null;
 
-  // Filtrado: el ámbito (scope) es el único filtro de área. Acá solo el estado.
-  let proyectosFiltrados = proyectosActivos;
-  if (params.estado && params.estado !== "todos") {
-    proyectosFiltrados = proyectosFiltrados.filter((py) => {
-      const av = avancePorProyecto.get(py.id);
-      const estado = !av || av.conDatos === 0 ? "sin_datos" : av.estado;
-      return estado === params.estado;
-    });
-  }
   const hayFiltros = !!scopeId || (!!params.estado && params.estado !== "todos");
 
   // Las cards llevan a su sección arrastrando los filtros del panel:

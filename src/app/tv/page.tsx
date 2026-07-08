@@ -1,7 +1,7 @@
-import { getPeriodoActivo, getResumenDashboard, getUnidades } from "@/lib/queries";
+import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { CircularProgress } from "@/components/ui/circular-progress";
-import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, calcularEstadoProyecto } from "@/lib/utils";
-import type { EstadoSemaforo, Meta } from "@/types/database";
+import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, calcularEstadoProyecto, calcularAvancePorIndicadores, avanceGlobalPorEstado } from "@/lib/utils";
+import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
 import { TvClock } from "./tv-clock";
 import Image from "next/image";
 
@@ -11,13 +11,33 @@ export default async function TvPage() {
   const periodo = await getPeriodoActivo();
   const resumen = await getResumenDashboard(periodo.id);
   const unidades = await getUnidades();
-
-  const estadoGlobal: EstadoSemaforo = !resumen.tieneSeguimiento
-    ? "sin_datos"
-    : resumen.porcentajeGlobal != null && resumen.porcentajeGlobal >= 70 ? "verde"
-    : resumen.porcentajeGlobal != null && resumen.porcentajeGlobal >= 40 ? "amarillo" : "rojo";
+  const indicadores = await getIndicadores();
 
   const proyectosActivos = resumen.proyectos.filter((p) => p.estado === "activo");
+
+  // Avance global ponderado por CANTIDAD de proyectos por estado (finalizado
+  // 100 %, en ejecución 50 %), calculado desde los indicadores — igual que el
+  // Panel Ejecutivo, para que ambas pantallas muestren el mismo número.
+  type IndConRel = Indicador & { meta?: { proyecto?: { id: string } } };
+  const indByProyecto = new Map<string, Indicador[]>();
+  for (const i of indicadores as IndConRel[]) {
+    const pyId = i.meta?.proyecto?.id;
+    if (pyId) (indByProyecto.get(pyId) ?? indByProyecto.set(pyId, []).get(pyId)!).push(i);
+  }
+  const distribucionProyectos = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
+  for (const py of proyectosActivos) {
+    const av = calcularAvancePorIndicadores(indByProyecto.get(py.id) ?? []);
+    if (av.conDatos === 0) distribucionProyectos.sin_datos++;
+    else distribucionProyectos[av.estado as "verde" | "amarillo" | "rojo"]++;
+  }
+  const porcentajeGlobal = avanceGlobalPorEstado(distribucionProyectos);
+  const tieneSeguimientoGlobal =
+    distribucionProyectos.verde + distribucionProyectos.amarillo + distribucionProyectos.rojo > 0;
+
+  const estadoGlobal: EstadoSemaforo = !tieneSeguimientoGlobal
+    ? "sin_datos"
+    : porcentajeGlobal != null && porcentajeGlobal >= 70 ? "verde"
+    : porcentajeGlobal != null && porcentajeGlobal >= 40 ? "amarillo" : "rojo";
 
   // Proyectos con seguimiento que estan en rojo
   const proyectosCriticos = proyectosActivos.filter((py) => {
@@ -71,8 +91,8 @@ export default async function TvPage() {
 
         {/* Avance Global */}
         <div className="col-span-3 row-span-3 rounded-2xl border border-border bg-surface flex flex-col items-center justify-center gap-3 p-6">
-          {resumen.tieneSeguimiento && resumen.porcentajeGlobal != null ? (
-            <CircularProgress value={resumen.porcentajeGlobal} estado={estadoGlobal} size={180} strokeWidth={12} />
+          {tieneSeguimientoGlobal && porcentajeGlobal != null ? (
+            <CircularProgress value={porcentajeGlobal} estado={estadoGlobal} size={180} strokeWidth={12} />
           ) : (
             <div className="h-[180px] w-[180px] rounded-full border-[12px] border-border/30 flex flex-col items-center justify-center">
               <span className="text-3xl font-light text-muted/40">—</span>
@@ -81,7 +101,7 @@ export default async function TvPage() {
           )}
           <div className="text-center">
             <p className="text-lg font-semibold text-foreground">
-              {resumen.tieneSeguimiento ? "Avance Global" : "Seguimiento Pendiente"}
+              {tieneSeguimientoGlobal ? "Avance Global" : "Seguimiento Pendiente"}
             </p>
             <p className="text-sm text-muted">{periodo.nombre}</p>
           </div>

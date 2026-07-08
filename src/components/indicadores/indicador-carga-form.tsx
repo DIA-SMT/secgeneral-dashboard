@@ -48,8 +48,16 @@ export function IndicadorCargaForm({
     setSaved(false);
 
     if (modo === "numerico") {
-      const num = Number(valorNum);
-      if (!isFinite(num)) {
+      const valorTrim = valorNum.trim();
+      const objTrim = objNum.trim();
+      if (valorTrim === "" && objTrim === "") {
+        setError("Ingresá un valor actual y/o un objetivo.");
+        return;
+      }
+      // Campo vacío ⇒ null (no 0). Un 0 espurio marcaría el indicador como
+      // "en ejecución" y lo contaría como avance aunque no haya dato cargado.
+      const num = valorTrim === "" ? null : Number(valorTrim);
+      if (num != null && !isFinite(num)) {
         setError("Ingresá un número válido (sin signo %).");
         return;
       }
@@ -58,7 +66,7 @@ export function IndicadorCargaForm({
           indicador_id: indicadorId,
           valor_actual: num,
           valor_actual_texto: null,
-          valor_objetivo: objNum.trim() !== "" && isFinite(Number(objNum)) ? Number(objNum) : null,
+          valor_objetivo: objTrim !== "" && isFinite(Number(objTrim)) ? Number(objTrim) : null,
           valor_objetivo_texto: null,
           unidad_medida: unidad || null,
           observacion: obs || null,
