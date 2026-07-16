@@ -39,25 +39,34 @@ export function semaforoTextColor(estado: EstadoSemaforo): string {
   return map[estado] ?? "text-muted";
 }
 
-// Estado del semáforo para mostrar en la UI. Si el indicador tiene algún dato
-// cargado, no puede figurar como "No iniciado" (rojo/sin_datos): se muestra
-// como "En ejecución" (amarillo). "Finalizado" (verde) queda como esté cargado.
+// Texto que en realidad representa "sin valor" (placeholders de importación:
+// "-", "—", "N/A", "s/d", ".", vacío).
+export function textoEsVacio(t: string | null | undefined): boolean {
+  const s = (t ?? "").trim();
+  return s === "" || /^(-+|—+|–+|n\/?a|s\/?d|\.)$/i.test(s);
+}
+
+// Texto que representa un cero ("0", "0%", "0,0").
+export function textoEsCero(t: string): boolean {
+  return /^0+([.,]0+)?$/.test(t.replace(/[%\s]/g, ""));
+}
+
+// Estado del semáforo para mostrar en la UI. La fuente de verdad es
+// estado_semaforo (recalculado al cargar), pero acá se blindan las reglas del
+// 16.07 por si quedara algún dato viejo desalineado:
+//   * valor numérico → lo que tenga guardado (0 ya se guarda como rojo)
+//   * texto "No" o "0" → No iniciado (rojo)
+//   * sin valor cargado / placeholder → Sin datos (aunque tenga objetivo)
+//   * resto → lo que tenga guardado
 export function estadoVisualIndicador(ind: {
   estado_semaforo: EstadoSemaforo;
   valor_actual: number | null;
   valor_actual_texto: string | null;
 }): EstadoSemaforo {
-  const tieneDato =
-    ind.valor_actual != null ||
-    (ind.valor_actual_texto != null && ind.valor_actual_texto.trim() !== "");
-  if (
-    tieneDato &&
-    (ind.estado_semaforo === "rojo" ||
-      ind.estado_semaforo === "sin_datos" ||
-      ind.estado_semaforo === "gris")
-  ) {
-    return "amarillo";
-  }
+  if (ind.valor_actual != null) return ind.estado_semaforo;
+  const s = (ind.valor_actual_texto ?? "").trim();
+  if (textoEsVacio(s)) return "sin_datos";
+  if (/^no$/i.test(s) || textoEsCero(s)) return "rojo";
   return ind.estado_semaforo;
 }
 
@@ -206,8 +215,9 @@ export function calcularAvancePorIndicadores(
       // Numérico SIN objetivo cargado: igual cuenta como avance reportado
       suma += porEstado(i.estado_semaforo);
       cnt++;
-    } else if (i.valor_actual_texto && i.valor_actual_texto.trim() !== "") {
-      // Texto (Sí/No, Realizado) → según su semáforo
+    } else if (!textoEsVacio(i.valor_actual_texto)) {
+      // Texto (Sí/No, Realizado) → según su semáforo. Los placeholders ("-",
+      // "N/A", etc.) no cuentan como dato.
       suma += porEstado(i.estado_semaforo);
       cnt++;
     }

@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "./supabase/server";
 import { requireValidacionSobreUnidad, requireRol, getPerfilActual } from "./auth";
+import { textoEsVacio, textoEsCero } from "./utils";
 import type { RolUsuario } from "@/types/database";
 
 // -------------------------------------------------------
@@ -496,10 +497,12 @@ export async function actualizarIndicador(input: {
   } else if (valor_actual != null && objetivoEfectivo != null) {
     estado = calcularSemaforo(valor_actual, objetivoEfectivo, 0, invertida);
   } else if (valor_actual != null) {
-    // Valor numérico cargado sin objetivo → se considera "en ejecución"
-    estado = "amarillo";
-  } else if (valor_actual_texto != null && valor_actual_texto.trim() !== "") {
-    estado = "amarillo";
+    // Valor numérico sin objetivo: 0 = No iniciado, > 0 = en ejecución.
+    estado = valor_actual === 0 && !invertida ? "rojo" : "amarillo";
+  } else if (valor_actual_texto != null && !textoEsVacio(valor_actual_texto)) {
+    // Texto "No" o "0" = No iniciado; el resto queda en ejecución.
+    const t = valor_actual_texto.trim();
+    estado = /^no$/i.test(t) || textoEsCero(t) ? "rojo" : "amarillo";
   } else {
     estado = "sin_datos";
   }
