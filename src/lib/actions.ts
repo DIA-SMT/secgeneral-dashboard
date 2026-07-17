@@ -4,7 +4,8 @@ import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "./supabase/server";
 import { requireValidacionSobreUnidad, requireRol, getPerfilActual } from "./auth";
-import { textoEsVacio, textoEsCero } from "./utils";
+import { textoEsVacio, textoEsCero, avanceIndicador, avanceAgregado } from "./utils";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RolUsuario } from "@/types/database";
 
 // -------------------------------------------------------
@@ -84,6 +85,28 @@ function calcularSemaforo(valor: number | null, objetivo: number | null, base: n
     : ((valor - base) / rango) * 100;
   const pct = Math.max(0, Math.min(100, pctRaw));
   return pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : "rojo";
+}
+
+// Materializa el estado_semaforo de una meta a partir de sus indicadores
+// (cascada 16.07). Sólo actúa cuando la meta tiene indicadores; si no, conserva
+// su propio estado (cargado con el avance de la meta). Se llama tras cualquier
+// cambio en un indicador para que los conteos de metas (KPI, TV, estructura,
+// chat) queden consistentes con la cascada.
+async function recomputarEstadoMeta(sb: SupabaseClient, metaId: string): Promise<void> {
+  const { data: inds } = await sb
+    .from("indicador")
+    .select("valor_actual, valor_objetivo, valor_actual_texto, estado_semaforo, metadata")
+    .eq("meta_id", metaId)
+    .is("deleted_at", null);
+  if (!inds || inds.length === 0) return;
+  const av = avanceAgregado(inds.map((i) => avanceIndicador(i as Parameters<typeof avanceIndicador>[0])));
+  await sb.from("meta").update({ estado_semaforo: av.estado }).eq("id", metaId);
+}
+
+// Devuelve el meta_id de un indicador (para recomputar la meta tras un cambio).
+async function metaIdDeIndicador(sb: SupabaseClient, indicadorId: string): Promise<string | null> {
+  const { data } = await sb.from("indicador").select("meta_id").eq("id", indicadorId).single();
+  return (data?.meta_id as string | undefined) ?? null;
 }
 
 // -------------------------------------------------------
@@ -478,7 +501,7 @@ export async function actualizarIndicador(input: {
   const sb = await getSupabaseServer();
   const { data: ind } = await sb
     .from("indicador")
-    .select("valor_objetivo, metadata")
+    .select("meta_id, valor_objetivo, metadata")
     .eq("id", indicador_id)
     .single();
 
@@ -535,6 +558,9 @@ export async function actualizarIndicador(input: {
 
   if (error) return { success: false, error: error.message };
 
+  // Propagar el cambio a la meta (estado por cascada).
+  if (ind?.meta_id) await recomputarEstadoMeta(sb, ind.meta_id as string);
+
   if (proyecto_id) revalidatePath(`/proyectos/${proyecto_id}`);
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
@@ -560,6 +586,7 @@ export async function borrarValorIndicador(input: {
     return { success: false, error: (e as Error).message };
   }
   const sb = await getSupabaseServer();
+  const metaId = await metaIdDeIndicador(sb, input.indicador_id);
   const { error } = await sb
     .from("indicador")
     .update({
@@ -571,6 +598,7 @@ export async function borrarValorIndicador(input: {
     })
     .eq("id", input.indicador_id);
   if (error) return { success: false, error: error.message };
+  if (metaId) await recomputarEstadoMeta(sb, metaId);
   if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
@@ -614,6 +642,9 @@ export async function editarIndicador(input: {
     .update(update)
     .eq("id", input.indicador_id);
   if (error) return { success: false, error: error.message };
+  // Cambiar el objetivo puede cambiar el % (y por ende el estado) de la meta.
+  const metaId = await metaIdDeIndicador(sb, input.indicador_id);
+  if (metaId) await recomputarEstadoMeta(sb, metaId);
   if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
@@ -635,11 +666,13 @@ export async function eliminarIndicador(input: {
     return { success: false, error: (e as Error).message };
   }
   const sb = await getSupabaseServer();
+  const metaId = await metaIdDeIndicador(sb, input.indicador_id);
   const { error } = await sb
     .from("indicador")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", input.indicador_id);
   if (error) return { success: false, error: error.message };
+  if (metaId) await recomputarEstadoMeta(sb, metaId);
   if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
   revalidatePath("/proyectos");
   revalidatePath("/indicadores");
@@ -674,6 +707,7 @@ export async function crearIndicador(input: {
 
   if (error) return { success: false, error: error.message };
 
+  await recomputarEstadoMeta(sb, input.meta_id);
   if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
   revalidatePath("/avance-direcciones");
   revalidatePath("/indicadores");

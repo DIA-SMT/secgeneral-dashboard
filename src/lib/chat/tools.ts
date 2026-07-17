@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { avanceIndicador, avanceAgregado } from "@/lib/utils";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // -------------------------------------------------------
@@ -666,7 +667,7 @@ export async function actualizarIndicador(params: {
 }) {
   const { data: ind } = await supabase
     .from("indicador")
-    .select("id, nombre, valor_objetivo, metadata")
+    .select("id, nombre, valor_objetivo, metadata, meta_id")
     .eq("id", params.indicador_id)
     .single();
   if (!ind) return { error: "Indicador no encontrado" };
@@ -697,6 +698,20 @@ export async function actualizarIndicador(params: {
     .eq("id", params.indicador_id);
 
   if (error) return { error: error.message };
+
+  // Propagar a la meta (estado por cascada).
+  const metaId = (ind as any).meta_id as string | undefined;
+  if (metaId) {
+    const { data: inds } = await supabase
+      .from("indicador")
+      .select("valor_actual, valor_objetivo, valor_actual_texto, estado_semaforo, metadata")
+      .eq("meta_id", metaId)
+      .is("deleted_at", null);
+    if (inds && inds.length > 0) {
+      const av = avanceAgregado(inds.map((i) => avanceIndicador(i as Parameters<typeof avanceIndicador>[0])));
+      await supabase.from("meta").update({ estado_semaforo: av.estado }).eq("id", metaId);
+    }
+  }
 
   return {
     success: true,
