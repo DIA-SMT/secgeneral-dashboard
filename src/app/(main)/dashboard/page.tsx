@@ -7,7 +7,7 @@ import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatFecha, calcularAvancePorIndicadores, avanceGlobalPorEstado } from "@/lib/utils";
+import { formatFecha, calcularPorcentajeMeta, avanceMeta, avanceAgregado, avanceGlobalPorEstado, type AvanceNivel } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
 import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
 import { Suspense } from "react";
@@ -67,12 +67,12 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Avance basado en INDICADORES (lo que cargan los directores)
   // -------------------------------------------------------
   type IndConRel = Indicador & { meta?: { proyecto?: { id: string; unidad_id: string } } };
-  const indByProyecto = new Map<string, Indicador[]>();
+  const indByMeta = new Map<string, Indicador[]>();
   const indByUnidad = new Map<string, Indicador[]>();
   for (const i of indicadores as IndConRel[]) {
-    const pyId = i.meta?.proyecto?.id;
+    const mId = i.meta_id;
     const uId = i.meta?.proyecto?.unidad_id;
-    if (pyId) (indByProyecto.get(pyId) ?? indByProyecto.set(pyId, []).get(pyId)!).push(i);
+    if (mId) (indByMeta.get(mId) ?? indByMeta.set(mId, []).get(mId)!).push(i);
     if (uId) (indByUnidad.get(uId) ?? indByUnidad.set(uId, []).get(uId)!).push(i);
   }
 
@@ -94,13 +94,18 @@ export default async function DashboardPage({ searchParams }: Props) {
     },
   };
 
-  // Avance por proyecto (a partir de sus indicadores)
-  const avancePorProyecto = new Map<string, ReturnType<typeof calcularAvancePorIndicadores>>();
+  // Avance por proyecto vía cascada: cada meta se deriva de sus indicadores y
+  // el proyecto es el promedio de sus metas (contando todas).
+  const avancePorProyecto = new Map<string, AvanceNivel>();
   for (const py of proyectosActivos) {
-    avancePorProyecto.set(py.id, calcularAvancePorIndicadores(indByProyecto.get(py.id) ?? []));
+    const metasDelPy = resumen.metasPorProyecto.get(py.id) ?? [];
+    const metaPcts = metasDelPy.map(
+      (m) => avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)).pct
+    );
+    avancePorProyecto.set(py.id, avanceAgregado(metaPcts));
   }
 
-  // Estado (semáforo) de un proyecto según sus indicadores
+  // Estado (semáforo) de un proyecto
   type EstadoProyecto = "verde" | "amarillo" | "rojo" | "sin_datos";
   const estadoProyecto = (py: { id: string }): EstadoProyecto => {
     const av = avancePorProyecto.get(py.id);
@@ -299,7 +304,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
               const av = avancePorProyecto.get(py.id);
               return <ProyectoCard key={py.id} proyecto={py} metas={metas}
-                avance={av ? { porcentaje: av.porcentaje, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
+                avance={av ? { porcentaje: av.pct, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
             })}
           </div>
         ) : (
@@ -322,7 +327,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                       const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
                       const av = avancePorProyecto.get(py.id);
                       return <ProyectoCard key={py.id} proyecto={py} metas={metas}
-                        avance={av ? { porcentaje: av.porcentaje, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
+                        avance={av ? { porcentaje: av.pct, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
                     })}
                   </div>
                   {pysSub.length > 9 && (

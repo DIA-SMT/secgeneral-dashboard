@@ -1,6 +1,6 @@
 import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { CircularProgress } from "@/components/ui/circular-progress";
-import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, calcularEstadoProyecto, calcularAvancePorIndicadores, avanceGlobalPorEstado } from "@/lib/utils";
+import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, avanceMeta, avanceAgregado, avanceGlobalPorEstado, type AvanceNivel } from "@/lib/utils";
 import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
 import { TvClock } from "./tv-clock";
 import Image from "next/image";
@@ -15,19 +15,25 @@ export default async function TvPage() {
 
   const proyectosActivos = resumen.proyectos.filter((p) => p.estado === "activo");
 
-  // Avance global ponderado por CANTIDAD de proyectos por estado (finalizado
-  // 100 %, en ejecución 50 %), calculado desde los indicadores — igual que el
-  // Panel Ejecutivo, para que ambas pantallas muestren el mismo número.
-  type IndConRel = Indicador & { meta?: { proyecto?: { id: string } } };
-  const indByProyecto = new Map<string, Indicador[]>();
-  for (const i of indicadores as IndConRel[]) {
-    const pyId = i.meta?.proyecto?.id;
-    if (pyId) (indByProyecto.get(pyId) ?? indByProyecto.set(pyId, []).get(pyId)!).push(i);
+  // Avance por proyecto vía cascada (indicadores → metas → proyecto), igual que
+  // el Panel Ejecutivo, para que ambas pantallas muestren lo mismo.
+  const indByMeta = new Map<string, Indicador[]>();
+  for (const i of indicadores as Indicador[]) {
+    if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
   }
+  const avancePorProyecto = new Map<string, AvanceNivel>();
+  for (const py of proyectosActivos) {
+    const metasPy = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
+    const pcts = metasPy.map((m) => avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)).pct);
+    avancePorProyecto.set(py.id, avanceAgregado(pcts));
+  }
+
+  // Avance global ponderado por CANTIDAD de proyectos por estado (finalizado
+  // 100 %, en ejecución 50 %, sobre el total).
   const distribucionProyectos = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
   for (const py of proyectosActivos) {
-    const av = calcularAvancePorIndicadores(indByProyecto.get(py.id) ?? []);
-    if (av.conDatos === 0) distribucionProyectos.sin_datos++;
+    const av = avancePorProyecto.get(py.id);
+    if (!av || av.conDatos === 0) distribucionProyectos.sin_datos++;
     else distribucionProyectos[av.estado as "verde" | "amarillo" | "rojo"]++;
   }
   const porcentajeGlobal = avanceGlobalPorEstado(distribucionProyectos);
@@ -39,11 +45,10 @@ export default async function TvPage() {
     : porcentajeGlobal != null && porcentajeGlobal >= 70 ? "verde"
     : porcentajeGlobal != null && porcentajeGlobal >= 40 ? "amarillo" : "rojo";
 
-  // Proyectos con seguimiento que estan en rojo
+  // Proyectos con seguimiento que estan en rojo (no iniciados)
   const proyectosCriticos = proyectosActivos.filter((py) => {
-    const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-    const { estado, tieneSeguimiento } = calcularEstadoProyecto(metas);
-    return tieneSeguimiento && estado === "rojo";
+    const av = avancePorProyecto.get(py.id);
+    return av != null && av.conDatos > 0 && av.estado === "rojo";
   });
 
   const ahora = new Date();
@@ -150,8 +155,7 @@ export default async function TvPage() {
               </div>
               <div className="flex-1 space-y-3 overflow-hidden">
                 {proyectosCriticos.slice(0, 4).map((py) => {
-                  const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-                  const { porcentaje } = calcularEstadoProyecto(metas);
+                  const porcentaje = avancePorProyecto.get(py.id)?.pct ?? null;
                   return (
                     <div key={py.id} className="flex items-center justify-between rounded-xl bg-danger/5 border border-danger/10 px-5 py-3">
                       <div>
@@ -192,11 +196,11 @@ export default async function TvPage() {
               const dirs = unidades.filter((u) => u.parent_id === unidad.id);
               const allIds = [unidad.id, ...dirs.map((d) => d.id)];
               const pysUnidad = proyectosActivos.filter((p) => allIds.includes(p.unidad_id));
-              const metasUnidad = pysUnidad.flatMap((py) => (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[]);
-              const tieneSeg = metasUnidad.some((m) => m.ultima_actualizacion != null);
-              const pcts = metasUnidad.map((m) => calcularPorcentajeMeta(m)).filter((p): p is number => p !== null);
-              const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
-              const estado: EstadoSemaforo = !tieneSeg ? "sin_datos" : avg >= 70 ? "verde" : avg >= 40 ? "amarillo" : "rojo";
+              // Avance del área = promedio de sus proyectos (cascada).
+              const areaAv = avanceAgregado(pysUnidad.map((p) => avancePorProyecto.get(p.id)?.pct ?? null));
+              const tieneSeg = areaAv.conDatos > 0;
+              const avg = areaAv.pct ?? 0;
+              const estado: EstadoSemaforo = areaAv.estado;
 
               return (
                 <div key={unidad.id} className="flex items-center gap-4">

@@ -230,6 +230,92 @@ export function calcularAvancePorIndicadores(
   return { porcentaje: avg, conDatos: cnt, total, estado };
 }
 
+// ---------------------------------------------------------------------------
+// Cascada de avance: indicador → meta → proyecto → dirección (correcciones
+// 16.07). El avance se propaga hacia arriba y se pondera contando TODOS los
+// hijos (los que no tienen dato cuentan como 0 %), para que un solo hijo al
+// 100 % no dispare el total al 100 %.
+// ---------------------------------------------------------------------------
+
+export type AvanceNivel = {
+  pct: number | null; // 0-100, o null si ningún hijo tiene dato
+  estado: EstadoSemaforo;
+  conDatos: number; // hijos con dato cargado
+  total: number; // total de hijos
+};
+
+// Estado (semáforo) derivado de un porcentaje de avance:
+//   sin dato → "sin_datos"; 0 → No iniciado (rojo); 100 → Finalizado (verde);
+//   intermedio → En ejecución (amarillo).
+export function estadoDeAvance(pct: number | null): EstadoSemaforo {
+  if (pct == null) return "sin_datos";
+  if (pct >= 100) return "verde";
+  if (pct <= 0) return "rojo";
+  return "amarillo";
+}
+
+const porEstadoPct = (e: EstadoSemaforo): number =>
+  e === "verde" ? 100 : e === "amarillo" ? 50 : 0;
+
+// % de avance de UN indicador (0-100), o null si no tiene dato cargado.
+export function avanceIndicador(ind: {
+  valor_actual: number | null;
+  valor_objetivo: number | null;
+  valor_actual_texto?: string | null;
+  estado_semaforo: EstadoSemaforo;
+  metadata?: Record<string, unknown> | null;
+}): number | null {
+  const invertida = (ind.metadata as Record<string, unknown> | undefined)?.invertida === true;
+  if (ind.valor_actual != null) {
+    if (ind.valor_objetivo != null) {
+      const base = 0;
+      if (ind.valor_objetivo === base) return ind.valor_actual >= ind.valor_objetivo ? 100 : 0;
+      const raw = invertida
+        ? ((base - ind.valor_actual) / (base - ind.valor_objetivo)) * 100
+        : (ind.valor_actual / ind.valor_objetivo) * 100;
+      return Math.max(0, Math.min(100, Math.round(raw)));
+    }
+    // Numérico sin objetivo: 0 = No iniciado; resto según su estado.
+    return ind.valor_actual === 0 && !invertida ? 0 : porEstadoPct(ind.estado_semaforo);
+  }
+  const texto = (ind.valor_actual_texto ?? "").trim();
+  if (!textoEsVacio(texto)) {
+    if (/^no$/i.test(texto) || textoEsCero(texto)) return 0;
+    return porEstadoPct(ind.estado_semaforo);
+  }
+  return null; // sin dato
+}
+
+// Agrega los % de los hijos (contando todos; los null = 0 %). Si ninguno tiene
+// dato → pct null (sin datos).
+export function avanceAgregado(pcts: (number | null)[]): AvanceNivel {
+  const total = pcts.length;
+  const conDatos = pcts.filter((p) => p != null).length;
+  if (total === 0 || conDatos === 0) {
+    return { pct: null, estado: "sin_datos", conDatos, total };
+  }
+  const suma = pcts.reduce((a: number, p) => a + (p ?? 0), 0);
+  const pct = Math.round(suma / total);
+  return { pct, estado: estadoDeAvance(pct), conDatos, total };
+}
+
+// % de una meta: se deriva de sus indicadores. Si la meta no tiene indicadores,
+// se usa su propio avance (metaPropioPct, calculado con calcularPorcentajeMeta).
+export function avanceMeta(
+  indicadores: Parameters<typeof avanceIndicador>[0][],
+  metaPropioPct: number | null
+): AvanceNivel {
+  if (indicadores.length > 0) {
+    return avanceAgregado(indicadores.map(avanceIndicador));
+  }
+  return {
+    pct: metaPropioPct,
+    estado: estadoDeAvance(metaPropioPct),
+    conDatos: metaPropioPct != null ? 1 : 0,
+    total: 0,
+  };
+}
+
 // Avance global a partir de la CANTIDAD de proyectos por estado (no del avance
 // individual de cada uno): finalizado = 100 %, en ejecución = 50 %, sobre el
 // total de proyectos (los "sin datos" cuentan como 0 %). Devuelve null si el

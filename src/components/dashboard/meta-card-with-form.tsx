@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { Meta, Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { calcularPorcentajeMeta, semaforoTextColor, formatFecha, formatFechaRelativa } from "@/lib/utils";
+import { calcularPorcentajeMeta, avanceMeta, semaforoTextColor, formatFecha, formatFechaRelativa } from "@/lib/utils";
 import { AvanceForm } from "./avance-form";
 import { IndicadoresPanel } from "@/components/indicadores/indicador-mini-form";
 import { editarMeta, eliminarMeta } from "@/lib/actions";
@@ -24,9 +24,15 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
   const [metaEdit, setMetaEdit] = useState(meta.valor_meta?.toString() ?? "");
   const [isPending, startTransition] = useTransition();
   const [editError, setEditError] = useState<string | null>(null);
-  const pct = calcularPorcentajeMeta(meta);
   const invertida = (meta.metadata as Record<string, unknown>)?.invertida === true;
-  const metaTieneSeg = meta.ultima_actualizacion != null;
+  // Avance de la meta: se deriva de sus indicadores (cascada 16.07); si no
+  // tiene indicadores, cae al avance propio de la meta.
+  const av = avanceMeta(indicadores, calcularPorcentajeMeta(meta));
+  const pct = av.pct;
+  const metaEstado = av.estado;
+  const metaTieneSeg = av.conDatos > 0;
+  // Seguimiento propio de la meta (para la línea "valor / objetivo").
+  const metaPropioSeg = meta.ultima_actualizacion != null;
 
   const guardarEdicion = () => {
     setEditError(null);
@@ -99,7 +105,7 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <StatusBadge estado={meta.estado_semaforo} />
+            <StatusBadge estado={metaEstado} />
             <span className="text-[10px] font-mono text-muted bg-border/50 px-1.5 py-0.5 rounded">
               {meta.tipo_medicion}
             </span>
@@ -121,9 +127,9 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
 
           {meta.tipo_medicion === "cuantitativo" && meta.valor_meta != null && (
             <p className="text-xs text-muted mt-1">
-              {metaTieneSeg ? (
+              {metaPropioSeg ? (
                 <>
-                  <span className={semaforoTextColor(meta.estado_semaforo) + " font-semibold"}>
+                  <span className={semaforoTextColor(metaEstado) + " font-semibold"}>
                     {meta.valor_actual ?? meta.valor_linea_base ?? 0}
                   </span>
                   {" / "}{meta.valor_meta} {meta.unidad_medida}
@@ -165,7 +171,7 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="w-28">
             {metaTieneSeg ? (
-              <ProgressBar value={pct} estado={meta.estado_semaforo} showLabel size="sm" />
+              <ProgressBar value={pct} estado={metaEstado} showLabel size="sm" />
             ) : (
               <span className="text-xs text-muted/50">—</span>
             )}
@@ -185,7 +191,7 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
       {meta.fecha_limite && (
         <p className="text-[10px] text-muted mt-2">
           Fecha límite: {formatFecha(meta.fecha_limite)}
-          {metaTieneSeg && meta.ultima_actualizacion && (
+          {metaPropioSeg && meta.ultima_actualizacion && (
             <> · Última actualización: {formatFechaRelativa(meta.ultima_actualizacion)}</>
           )}
         </p>

@@ -8,7 +8,7 @@ import { NuevaMetaForm } from "@/components/dashboard/nueva-meta-form";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { formatFecha, formatFechaRelativa, calcularEstadoProyecto, calcularAvancePorIndicadores } from "@/lib/utils";
+import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, avanceMeta, avanceAgregado, avanceIndicador } from "@/lib/utils";
 import { MiniGauge } from "@/components/ui/mini-gauge";
 import { BackButton } from "@/components/layout/back-button";
 import Link from "next/link";
@@ -55,9 +55,15 @@ export default async function ProyectoDetallePage({
     }
   }
 
-  const { porcentaje: avgPct, estado: estadoGlobal, tieneSeguimiento } = calcularEstadoProyecto(metas);
-  // Avance basado en indicadores cargados
-  const avanceInd = calcularAvancePorIndicadores(indicadores);
+  // Avance del proyecto por cascada: cada meta se deriva de sus indicadores y
+  // el proyecto es el promedio de las metas (contando todas).
+  const metaAvances = metas.map((m) =>
+    avanceMeta(indicadoresPorMeta.get(m.id) ?? [], calcularPorcentajeMeta(m))
+  );
+  const avanceProy = avanceAgregado(metaAvances.map((a) => a.pct));
+  const estadoGlobal = avanceProy.estado;
+  const tieneSeguimiento = avanceProy.conDatos > 0;
+  const conDatosInd = indicadores.filter((i) => avanceIndicador(i) != null).length;
   const ahora = new Date().toISOString().slice(0, 10);
 
   return (
@@ -102,21 +108,21 @@ export default async function ProyectoDetallePage({
           </div>
           <div className="flex items-center gap-6 shrink-0">
             <MiniGauge
-              value={avanceInd.porcentaje}
-              estado={avanceInd.estado}
+              value={avanceProy.pct}
+              estado={avanceProy.estado}
               size={72}
-              label="Avance (indicadores)"
+              label="Avance del proyecto"
             />
             <div className="text-center">
               <p className="text-3xl font-bold text-foreground">{indicadores.length}</p>
               <p className="text-xs text-muted">Indicadores</p>
-              <p className="text-[9px] text-muted/70">{avanceInd.conDatos} con datos</p>
+              <p className="text-[9px] text-muted/70">{conDatosInd} con datos</p>
             </div>
           </div>
         </div>
         {tieneSeguimiento ? (
           <div className="mt-4">
-            <ProgressBar value={avgPct} estado={estadoGlobal} size="lg" />
+            <ProgressBar value={avanceProy.pct} estado={estadoGlobal} size="lg" />
           </div>
         ) : (
           <div className="mt-4 h-3 rounded-full bg-border/20 flex items-center justify-center">

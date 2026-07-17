@@ -1,8 +1,8 @@
-import { getPeriodoActivo, getProyectos, getUnidades, getMetasDelPeriodo } from "@/lib/queries";
+import { getPeriodoActivo, getProyectos, getUnidades, getMetasDelPeriodo, getIndicadores } from "@/lib/queries";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { calcularPorcentajeMeta } from "@/lib/utils";
-import type { UnidadOrganizacional } from "@/types/database";
+import { calcularPorcentajeMeta, avanceMeta, type AvanceNivel } from "@/lib/utils";
+import type { Indicador, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 
 export const revalidate = 60;
@@ -21,13 +21,24 @@ export default async function MetasPage({ searchParams }: Props) {
 
   const proyectosMap = new Map(periodoProyectos.map((p) => [p.id, p]));
   let metas = await getMetasDelPeriodo(periodo.id);
+  const indicadores = await getIndicadores();
+
+  // Avance de cada meta desde sus indicadores (cascada 16.07).
+  const indByMeta = new Map<string, Indicador[]>();
+  for (const i of indicadores as Indicador[]) {
+    if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
+  }
+  const avByMeta = new Map<string, AvanceNivel>();
+  for (const m of metas) {
+    avByMeta.set(m.id, avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)));
+  }
 
   if (params.q) {
     const q = params.q.toLowerCase();
     metas = metas.filter((m) => m.nombre.toLowerCase().includes(q));
   }
   if (params.estado && params.estado !== "todos") {
-    metas = metas.filter((m) => m.estado_semaforo === params.estado);
+    metas = metas.filter((m) => avByMeta.get(m.id)?.estado === params.estado);
   }
   if (params.unidad) {
     const descendientes = (id: string): string[] => {
@@ -53,7 +64,10 @@ export default async function MetasPage({ searchParams }: Props) {
       <div className="space-y-2">
         {metas.map((m) => {
           const py = proyectosMap.get(m.proyecto_id);
-          const pct = calcularPorcentajeMeta(m);
+          const av = avByMeta.get(m.id);
+          const pct = av?.pct ?? null;
+          const estado = av?.estado ?? "sin_datos";
+          const tieneSeg = (av?.conDatos ?? 0) > 0;
           return (
             <Link
               key={m.id}
@@ -61,7 +75,7 @@ export default async function MetasPage({ searchParams }: Props) {
               className="flex items-center gap-4 p-3 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary/30 transition-all group"
             >
               <div className="w-20 shrink-0">
-                <StatusBadge estado={m.estado_semaforo} />
+                <StatusBadge estado={estado} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
@@ -72,8 +86,8 @@ export default async function MetasPage({ searchParams }: Props) {
                 )}
               </div>
               <div className="w-28 hidden md:block">
-                {m.ultima_actualizacion ? (
-                  <ProgressBar value={pct} estado={m.estado_semaforo} size="sm" />
+                {tieneSeg ? (
+                  <ProgressBar value={pct} estado={estado} size="sm" />
                 ) : (
                   <span className="text-[10px] text-muted">Pendiente</span>
                 )}

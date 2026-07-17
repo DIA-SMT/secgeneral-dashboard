@@ -1,39 +1,29 @@
-import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores } from "@/lib/queries";
+import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores, getMetasDelPeriodo } from "@/lib/queries";
 import { BackButton } from "@/components/layout/back-button";
+import { avanceMeta, avanceAgregado, calcularPorcentajeMeta, estadoDeAvance } from "@/lib/utils";
 import Link from "next/link";
-import type { Indicador, UnidadOrganizacional } from "@/types/database";
+import type { Indicador, Meta, UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
-
-interface IndicadorEnDireccion {
-  ind: Indicador;
-  unidad_id: string;
-}
 
 interface ResumenDireccion {
   unidad: UnidadOrganizacional;
   secretaria: UnidadOrganizacional | null;
-  totalIndicadores: number;
-  conValor: number;
-  promedioPct: number; // 0-100
+  totalProyectos: number;
+  conDatos: number;
+  promedioPct: number | null; // 0-100 (cascada), null si sin datos
   semaforo: { verde: number; amarillo: number; rojo: number; sin_datos: number };
 }
 
-function calcPct(valor: number, objetivo: number): number {
-  if (objetivo === 0) return valor >= objetivo ? 100 : 0;
-  const raw = (valor / objetivo) * 100;
-  return Math.max(0, Math.min(100, raw));
-}
-
 export default async function AvanceDireccionesPage() {
-  const [periodo, proyectos, unidades, indicadores] = await Promise.all([
-    getPeriodoActivo(),
-    getProyectos((await getPeriodoActivo()).id),
+  const periodo = await getPeriodoActivo();
+  const [proyectos, unidades, indicadores, metas] = await Promise.all([
+    getProyectos(periodo.id),
     getUnidades(),
     getIndicadores(),
+    getMetasDelPeriodo(periodo.id),
   ]);
 
-  const proyectoUnidad = new Map(proyectos.map((p) => [p.id, p.unidad_id]));
   const unidadById = new Map(unidades.map((u) => [u.id, u]));
 
   // Encontrar ancestro Secretaría
@@ -43,84 +33,48 @@ export default async function AvanceDireccionesPage() {
     return cur;
   };
 
-  // Mapear indicador → unidad
-  type IndicadorConRel = Indicador & { meta?: { proyecto?: { id: string; unidad_id: string } } };
-  const indicadoresConUnidad: IndicadorEnDireccion[] = [];
-  for (const i of indicadores as IndicadorConRel[]) {
-    const pyId = i.meta?.proyecto?.id;
-    if (!pyId) continue;
-    const unidadId = proyectoUnidad.get(pyId);
-    if (!unidadId) continue;
-    indicadoresConUnidad.push({ ind: i as Indicador, unidad_id: unidadId });
+  // Indicadores por meta y metas por proyecto (para la cascada)
+  const indByMeta = new Map<string, Indicador[]>();
+  for (const i of indicadores as Indicador[]) {
+    if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
+  }
+  const metasByProyecto = new Map<string, Meta[]>();
+  for (const m of metas) {
+    (metasByProyecto.get(m.proyecto_id) ?? metasByProyecto.set(m.proyecto_id, []).get(m.proyecto_id)!).push(m);
   }
 
-  // Agrupar por dirección
-  const porUnidad = new Map<string, Indicador[]>();
-  for (const { ind, unidad_id } of indicadoresConUnidad) {
-    (porUnidad.get(unidad_id) ?? porUnidad.set(unidad_id, []).get(unidad_id)!).push(ind);
+  // Avance de cada proyecto por cascada (meta → proyecto)
+  const avancePorProyecto = new Map<string, number | null>();
+  for (const py of proyectos) {
+    const metasPy = metasByProyecto.get(py.id) ?? [];
+    const pcts = metasPy.map((m) => avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)).pct);
+    avancePorProyecto.set(py.id, avanceAgregado(pcts).pct);
   }
 
-  // Calcular resumen por dirección
+  // Agrupar proyectos por dirección (unidad)
+  const proyectosPorUnidad = new Map<string, typeof proyectos>();
+  for (const py of proyectos) {
+    (proyectosPorUnidad.get(py.unidad_id) ?? proyectosPorUnidad.set(py.unidad_id, []).get(py.unidad_id)!).push(py);
+  }
+
+  // Resumen por dirección: avance = promedio de sus proyectos (contando todos)
   const resumenes: ResumenDireccion[] = [];
-  for (const [unidadId, inds] of porUnidad.entries()) {
+  for (const [unidadId, pys] of proyectosPorUnidad.entries()) {
     const unidad = unidadById.get(unidadId);
     if (!unidad) continue;
-    const conValorNumerico = inds.filter(
-      (i) => i.valor_actual != null && i.valor_objetivo != null
-    );
-    const conValorTexto = inds.filter(
-      (i) => i.valor_actual_texto && i.valor_actual_texto.trim() !== ""
-    );
-    const totalIndicadores = inds.length;
-    const conValor = conValorNumerico.length + conValorTexto.length;
-
-    let suma = 0;
-    let cnt = 0;
-    for (const i of conValorNumerico) {
-      const pct = calcPct(i.valor_actual!, i.valor_objetivo!);
-      suma += pct;
-      cnt++;
-    }
-    // Avances textuales: cada uno aporta según su semáforo
-    for (const i of conValorTexto) {
-      const pctTxt =
-        i.estado_semaforo === "verde"
-          ? 100
-          : i.estado_semaforo === "amarillo"
-          ? 50
-          : i.estado_semaforo === "rojo"
-          ? 10
-          : 0;
-      suma += pctTxt;
-      cnt++;
-    }
-    const promedio = cnt > 0 ? Math.round(suma / cnt) : 0;
-
+    const pcts = pys.map((p) => avancePorProyecto.get(p.id) ?? null);
+    const agg = avanceAgregado(pcts);
     const semaforo = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
-    for (const i of inds) {
-      const e =
-        i.estado_semaforo === "verde"
-          ? "verde"
-          : i.estado_semaforo === "amarillo"
-          ? "amarillo"
-          : i.estado_semaforo === "rojo"
-          ? "rojo"
-          : "sin_datos";
-      semaforo[e as keyof typeof semaforo]++;
-    }
-
+    for (const p of pcts) semaforo[estadoDeAvance(p) as keyof typeof semaforo]++;
     resumenes.push({
       unidad,
       secretaria: findSecretaria(unidadId),
-      totalIndicadores,
-      conValor,
-      promedioPct: promedio,
+      totalProyectos: pys.length,
+      conDatos: agg.conDatos,
+      promedioPct: agg.pct,
       semaforo,
     });
   }
-
-  // Ordenar por % de avance desc
-  resumenes.sort((a, b) => b.promedioPct - a.promedioPct);
 
   // Agrupar por Secretaría
   const porSecretaria = new Map<string, ResumenDireccion[]>();
@@ -129,13 +83,12 @@ export default async function AvanceDireccionesPage() {
     (porSecretaria.get(r.secretaria.id) ?? porSecretaria.set(r.secretaria.id, []).get(r.secretaria.id)!).push(r);
   }
 
-  // Promedio por secretaría
-  const promedioPorSec = new Map<string, number>();
+  // Avance por secretaría = promedio de los proyectos de todas sus direcciones
+  const promedioPorSec = new Map<string, number | null>();
   for (const [secId, lista] of porSecretaria.entries()) {
-    const conDatos = lista.filter((l) => l.conValor > 0);
-    const avg =
-      conDatos.length > 0 ? Math.round(conDatos.reduce((a, b) => a + b.promedioPct, 0) / conDatos.length) : 0;
-    promedioPorSec.set(secId, avg);
+    const pysSec = lista.flatMap((l) => (proyectosPorUnidad.get(l.unidad.id) ?? []));
+    const pcts = pysSec.map((p) => avancePorProyecto.get(p.id) ?? null);
+    promedioPorSec.set(secId, avanceAgregado(pcts).pct);
   }
 
   const secretarias = Array.from(porSecretaria.keys())
@@ -152,19 +105,19 @@ export default async function AvanceDireccionesPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Avance por Dirección</h1>
         <p className="text-sm text-muted mt-1">
-          Grado de avance de la POA de cada dirección calculado a partir de sus indicadores · {periodo.nombre}
+          Avance de la POA de cada dirección: indicadores → metas → proyectos · {periodo.nombre}
         </p>
       </div>
 
       {resumenes.length === 0 ? (
         <div className="rounded-xl border border-border bg-surface p-8 text-center">
-          <p className="text-sm text-muted">Sin indicadores cargados todavía</p>
+          <p className="text-sm text-muted">Sin proyectos cargados todavía</p>
         </div>
       ) : (
         <div className="space-y-8">
           {secretarias.map((sec) => {
             const lista = porSecretaria.get(sec.id) ?? [];
-            const promSec = promedioPorSec.get(sec.id) ?? 0;
+            const promSec = promedioPorSec.get(sec.id);
             return (
               <section key={sec.id}>
                 <div className="flex items-center justify-between mb-3">
@@ -176,13 +129,13 @@ export default async function AvanceDireccionesPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] text-muted uppercase tracking-wider">Avance promedio</p>
-                    <p className="text-lg font-bold text-foreground">{promSec}%</p>
+                    <p className="text-lg font-bold text-foreground">{promSec != null ? `${promSec}%` : "—"}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   {lista
-                    .sort((a, b) => b.promedioPct - a.promedioPct)
+                    .sort((a, b) => (b.promedioPct ?? -1) - (a.promedioPct ?? -1))
                     .map((r) => (
                       <DireccionRow key={r.unidad.id} resumen={r} />
                     ))}
@@ -199,7 +152,7 @@ export default async function AvanceDireccionesPage() {
 function DireccionRow({ resumen }: { resumen: ResumenDireccion }) {
   const pct = resumen.promedioPct;
   const barColor =
-    pct >= 80 ? "bg-success" : pct >= 50 ? "bg-warning" : pct > 0 ? "bg-danger" : "bg-muted/30";
+    pct == null ? "bg-muted/30" : pct >= 100 ? "bg-success" : pct > 0 ? "bg-warning" : "bg-danger";
 
   return (
     <div className="rounded-lg border border-border bg-surface p-3">
@@ -211,14 +164,16 @@ function DireccionRow({ resumen }: { resumen: ResumenDireccion }) {
           {resumen.unidad.nombre_corto ?? resumen.unidad.nombre}
         </Link>
         <span className="text-xs text-muted shrink-0">
-          {resumen.conValor}/{resumen.totalIndicadores} indicadores con datos
+          {resumen.conDatos}/{resumen.totalProyectos} proyectos con datos
         </span>
-        <span className="text-lg font-bold text-foreground shrink-0 w-12 text-right">{pct}%</span>
+        <span className="text-lg font-bold text-foreground shrink-0 w-12 text-right">
+          {pct != null ? `${pct}%` : "—"}
+        </span>
       </div>
       <div className="h-2 rounded-full bg-border/30 overflow-hidden">
         <div
           className={`h-full ${barColor} transition-all`}
-          style={{ width: `${Math.max(2, pct)}%` }}
+          style={{ width: `${Math.max(2, pct ?? 0)}%` }}
         />
       </div>
       <div className="flex items-center gap-3 mt-2 text-[10px] text-muted">
