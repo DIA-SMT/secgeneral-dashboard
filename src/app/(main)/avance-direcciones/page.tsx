@@ -1,6 +1,6 @@
 import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores, getMetasDelPeriodo } from "@/lib/queries";
 import { BackButton } from "@/components/layout/back-button";
-import { avanceMeta, avanceAgregado, calcularPorcentajeMeta, estadoDeAvance } from "@/lib/utils";
+import { avanceMetaEnPlazo, avanceAgregado, calcularPorcentajeMeta, estadoDeAvance } from "@/lib/utils";
 import Link from "next/link";
 import type { Indicador, Meta, UnidadOrganizacional } from "@/types/database";
 
@@ -43,11 +43,20 @@ export default async function AvanceDireccionesPage() {
     (metasByProyecto.get(m.proyecto_id) ?? metasByProyecto.set(m.proyecto_id, []).get(m.proyecto_id)!).push(m);
   }
 
-  // Avance de cada proyecto por cascada (meta → proyecto)
+  const hoy = new Date().toISOString().slice(0, 10);
+  // Avance de cada proyecto por cascada (meta → proyecto), considerando el plazo.
   const avancePorProyecto = new Map<string, number | null>();
   for (const py of proyectos) {
     const metasPy = metasByProyecto.get(py.id) ?? [];
-    const pcts = metasPy.map((m) => avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)).pct);
+    const pcts = metasPy.map(
+      (m) =>
+        avanceMetaEnPlazo(
+          indByMeta.get(m.id) ?? [],
+          calcularPorcentajeMeta(m),
+          { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+          hoy
+        ).pct
+    );
     avancePorProyecto.set(py.id, avanceAgregado(pcts).pct);
   }
 

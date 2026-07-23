@@ -109,7 +109,13 @@ function CreateForm({
   metaValorMeta,
   metaUnidadMedida,
 }: {
-  onSubmit: (data: { nombre: string; unidad_medida?: string | null; valor_objetivo?: number | null }) => void;
+  onSubmit: (data: {
+    nombre: string;
+    unidad_medida?: string | null;
+    valor_objetivo?: number | null;
+    fecha_inicio?: string | null;
+    fecha_fin?: string | null;
+  }) => void;
   isPending: boolean;
   metaValorMeta?: number | null;
   metaUnidadMedida?: string | null;
@@ -117,6 +123,8 @@ function CreateForm({
   const [nombre, setNombre] = useState("");
   const [unidad, setUnidad] = useState(metaUnidadMedida ?? "");
   const [objetivo, setObjetivo] = useState(metaValorMeta?.toString() ?? "");
+  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaFin, setFechaFin] = useState("");
 
   return (
     <form
@@ -127,10 +135,14 @@ function CreateForm({
           nombre,
           unidad_medida: unidad || null,
           valor_objetivo: objetivo ? Number(objetivo) : null,
+          fecha_inicio: fechaInicio || null,
+          fecha_fin: fechaFin || null,
         });
         setNombre("");
         setUnidad("");
         setObjetivo("");
+        setFechaInicio("");
+        setFechaFin("");
       }}
       className="space-y-2 p-2 bg-surface rounded border border-border"
     >
@@ -158,6 +170,26 @@ function CreateForm({
           onChange={(e) => setObjetivo(e.target.value)}
           className="w-24 text-xs bg-background border border-border rounded px-2 py-1 text-foreground"
         />
+      </div>
+      <div className="flex gap-2">
+        <label className="flex-1 text-[10px] text-muted">
+          Inicio del plazo
+          <input
+            type="date"
+            value={fechaInicio}
+            onChange={(e) => setFechaInicio(e.target.value)}
+            className="mt-0.5 w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground"
+          />
+        </label>
+        <label className="flex-1 text-[10px] text-muted">
+          Fin del plazo
+          <input
+            type="date"
+            value={fechaFin}
+            onChange={(e) => setFechaFin(e.target.value)}
+            className="mt-0.5 w-full text-xs bg-background border border-border rounded px-2 py-1 text-foreground"
+          />
+        </label>
       </div>
       <button
         type="submit"

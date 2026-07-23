@@ -7,7 +7,7 @@ import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
-import { calcularPorcentajeMeta, avanceMeta, avanceAgregado, avanceGlobalPorEstado, type AvanceNivel } from "@/lib/utils";
+import { calcularPorcentajeMeta, avanceMetaEnPlazo, avanceAgregado, avanceGlobalPonderado, type AvanceNivel } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
 import type { Meta, Indicador } from "@/types/database";
 import { Suspense } from "react";
@@ -94,13 +94,21 @@ export default async function DashboardPage({ searchParams }: Props) {
     },
   };
 
+  const hoy = new Date().toISOString().slice(0, 10);
+
   // Avance por proyecto vía cascada: cada meta se deriva de sus indicadores y
-  // el proyecto es el promedio de sus metas (contando todas).
+  // el proyecto es el promedio de sus metas (contando todas). Considera el plazo.
   const avancePorProyecto = new Map<string, AvanceNivel>();
   for (const py of proyectosActivos) {
     const metasDelPy = resumen.metasPorProyecto.get(py.id) ?? [];
     const metaPcts = metasDelPy.map(
-      (m) => avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)).pct
+      (m) =>
+        avanceMetaEnPlazo(
+          indByMeta.get(m.id) ?? [],
+          calcularPorcentajeMeta(m),
+          { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+          hoy
+        ).pct
     );
     avancePorProyecto.set(py.id, avanceAgregado(metaPcts));
   }
@@ -129,10 +137,24 @@ export default async function DashboardPage({ searchParams }: Props) {
     proyectosFiltrados = proyectosActivos.filter((py) => estadoProyecto(py) === params.estado);
   }
 
-  // Avance global ponderado por CANTIDAD de proyectos por estado (finalizado
-  // 100 %, en ejecución 50 %), recalculado sobre el conjunto filtrado.
+  // Avance global = promedio del grado de avance de las metas ponderado por su
+  // "valor particular" (meta.peso), sobre las metas de los proyectos filtrados
+  // (correcciones 23.07 pág. 18). Los segmentos del anillo siguen mostrando la
+  // distribución por cantidad de proyectos por estado.
   const distribucionGlobal = distribucion(proyectosFiltrados);
-  const porcentajeGlobal = avanceGlobalPorEstado(distribucionGlobal);
+  const idsFiltrados = new Set(proyectosFiltrados.map((p) => p.id));
+  const metasGlobal = metasScope.filter((m) => idsFiltrados.has(m.proyecto_id));
+  const porcentajeGlobal = avanceGlobalPonderado(
+    metasGlobal.map((m) => ({
+      pct: avanceMetaEnPlazo(
+        indByMeta.get(m.id) ?? [],
+        calcularPorcentajeMeta(m),
+        { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+        hoy
+      ).pct,
+      peso: m.peso,
+    }))
+  );
   // Hay seguimiento si al menos un proyecto del conjunto tiene datos cargados.
   const tieneSeguimiento =
     distribucionGlobal.verde + distribucionGlobal.amarillo + distribucionGlobal.rojo > 0;

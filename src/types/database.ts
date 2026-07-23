@@ -95,6 +95,7 @@ export interface Meta {
   escala_cualitativa: { niveles: NivelEscala[] } | null;
   frecuencia_medicion: FrecuenciaMedicion | null;
   medio_verificacion: string | null;
+  fecha_inicio: string | null;
   fecha_limite: string | null;
   peso: number | null;
   orden: number;
@@ -173,6 +174,8 @@ export interface Indicador {
   valor_objetivo: number | null;
   valor_objetivo_texto: string | null;
   observacion: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
   estado_semaforo: EstadoSemaforo;
   ultima_actualizacion: string | null;
   orden: number;

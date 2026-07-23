@@ -9,7 +9,7 @@ import { ProyectoAcciones } from "@/components/dashboard/proyecto-acciones";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, avanceMeta, avanceAgregado, avanceIndicador } from "@/lib/utils";
+import { formatFecha, calcularPorcentajeMeta, avanceMetaEnPlazo, avanceAgregado, avanceIndicadorEnPlazo } from "@/lib/utils";
 import { MiniGauge } from "@/components/ui/mini-gauge";
 import { BackButton } from "@/components/layout/back-button";
 import Link from "next/link";
@@ -56,16 +56,21 @@ export default async function ProyectoDetallePage({
     }
   }
 
+  const ahora = new Date().toISOString().slice(0, 10);
   // Avance del proyecto por cascada: cada meta se deriva de sus indicadores y
-  // el proyecto es el promedio de las metas (contando todas).
+  // el proyecto es el promedio de las metas (contando todas). Considera el plazo.
   const metaAvances = metas.map((m) =>
-    avanceMeta(indicadoresPorMeta.get(m.id) ?? [], calcularPorcentajeMeta(m))
+    avanceMetaEnPlazo(
+      indicadoresPorMeta.get(m.id) ?? [],
+      calcularPorcentajeMeta(m),
+      { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+      ahora
+    )
   );
   const avanceProy = avanceAgregado(metaAvances.map((a) => a.pct));
   const estadoGlobal = avanceProy.estado;
   const tieneSeguimiento = avanceProy.conDatos > 0;
-  const conDatosInd = indicadores.filter((i) => avanceIndicador(i) != null).length;
-  const ahora = new Date().toISOString().slice(0, 10);
+  const conDatosInd = indicadores.filter((i) => avanceIndicadorEnPlazo(i, ahora) != null).length;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -155,6 +160,7 @@ export default async function ProyectoDetallePage({
               proyectoId={proyecto.id}
               indicadores={indicadoresPorMeta.get(meta.id) ?? []}
               puedeCargar={puedeCargar}
+              hoy={ahora}
             />
           ))}
         </div>

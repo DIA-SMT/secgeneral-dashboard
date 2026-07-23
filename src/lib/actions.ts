@@ -617,6 +617,8 @@ export async function editarIndicador(input: {
   unidad_medida?: string | null;
   valor_objetivo?: number | null;
   valor_objetivo_texto?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
   proyecto_id?: string;
 }) {
   try {
@@ -629,12 +631,16 @@ export async function editarIndicador(input: {
     unidad_medida?: string | null;
     valor_objetivo?: number | null;
     valor_objetivo_texto?: string | null;
+    fecha_inicio?: string | null;
+    fecha_fin?: string | null;
   };
   const update: UpdatePayload = {};
   if (input.nombre !== undefined) update.nombre = input.nombre;
   if (input.unidad_medida !== undefined) update.unidad_medida = input.unidad_medida;
   if (input.valor_objetivo !== undefined) update.valor_objetivo = input.valor_objetivo;
   if (input.valor_objetivo_texto !== undefined) update.valor_objetivo_texto = input.valor_objetivo_texto;
+  if (input.fecha_inicio !== undefined) update.fecha_inicio = input.fecha_inicio || null;
+  if (input.fecha_fin !== undefined) update.fecha_fin = input.fecha_fin || null;
 
   const sb = await getSupabaseServer();
   const { error } = await sb
@@ -689,6 +695,8 @@ export async function crearIndicador(input: {
   nombre: string;
   unidad_medida?: string | null;
   valor_objetivo?: number | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
   proyecto_id?: string;
 }) {
   try {
@@ -702,6 +710,8 @@ export async function crearIndicador(input: {
     nombre: input.nombre,
     unidad_medida: input.unidad_medida ?? null,
     valor_objetivo: input.valor_objetivo ?? null,
+    fecha_inicio: input.fecha_inicio || null,
+    fecha_fin: input.fecha_fin || null,
     estado_semaforo: "sin_datos",
   });
 
@@ -1050,6 +1060,9 @@ export async function crearMeta(input: {
   tipo_medicion?: "cuantitativo" | "cualitativo" | "hito_unico";
   unidad_medida?: string | null;
   valor_meta?: number | null;
+  fecha_inicio?: string | null;
+  fecha_limite?: string | null;
+  peso?: number | null;
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
@@ -1065,6 +1078,9 @@ export async function crearMeta(input: {
     tipo_medicion: input.tipo_medicion ?? "cuantitativo",
     unidad_medida: input.unidad_medida?.trim() || null,
     valor_meta: input.valor_meta ?? null,
+    fecha_inicio: input.fecha_inicio || null,
+    fecha_limite: input.fecha_limite || null,
+    peso: input.peso ?? null,
     estado_semaforo: "sin_datos",
   });
   if (error) return { success: false, error: error.message };
@@ -1080,6 +1096,9 @@ export async function editarMeta(input: {
   nombre?: string;
   unidad_medida?: string | null;
   valor_meta?: number | null;
+  fecha_inicio?: string | null;
+  fecha_limite?: string | null;
+  peso?: number | null;
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
@@ -1094,6 +1113,9 @@ export async function editarMeta(input: {
   if (input.nombre !== undefined) update.nombre = input.nombre.trim();
   if (input.unidad_medida !== undefined) update.unidad_medida = input.unidad_medida?.trim() || null;
   if (input.valor_meta !== undefined) update.valor_meta = input.valor_meta;
+  if (input.fecha_inicio !== undefined) update.fecha_inicio = input.fecha_inicio || null;
+  if (input.fecha_limite !== undefined) update.fecha_limite = input.fecha_limite || null;
+  if (input.peso !== undefined) update.peso = input.peso;
 
   const sb = await getSupabaseServer();
   const { error } = await sb.from("meta").update(update).eq("id", input.meta_id);

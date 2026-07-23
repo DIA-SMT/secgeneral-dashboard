@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import type { Meta, Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { calcularPorcentajeMeta, avanceMeta, semaforoTextColor, formatFecha, formatFechaRelativa } from "@/lib/utils";
+import { calcularPorcentajeMeta, avanceMetaEnPlazo, semaforoTextColor, formatFechaRelativa } from "@/lib/utils";
+import { PlazoBadge } from "@/components/ui/plazo-badge";
 import { AvanceForm } from "./avance-form";
 import { IndicadoresPanel } from "@/components/indicadores/indicador-mini-form";
 import { editarMeta, eliminarMeta } from "@/lib/actions";
@@ -14,20 +15,30 @@ interface MetaCardWithFormProps {
   proyectoId: string;
   indicadores?: Indicador[];
   puedeCargar?: boolean;
+  /** Fecha actual YYYY-MM-DD (para el estado por plazo). */
+  hoy: string;
 }
 
-export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCargar = false }: MetaCardWithFormProps) {
+export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCargar = false, hoy }: MetaCardWithFormProps) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [nombreEdit, setNombreEdit] = useState(meta.nombre);
   const [unidadEdit, setUnidadEdit] = useState(meta.unidad_medida ?? "");
   const [metaEdit, setMetaEdit] = useState(meta.valor_meta?.toString() ?? "");
+  const [inicioEdit, setInicioEdit] = useState(meta.fecha_inicio ?? "");
+  const [limiteEdit, setLimiteEdit] = useState(meta.fecha_limite ?? "");
+  const [pesoEdit, setPesoEdit] = useState(meta.peso?.toString() ?? "");
   const [isPending, startTransition] = useTransition();
   const [editError, setEditError] = useState<string | null>(null);
   const invertida = (meta.metadata as Record<string, unknown>)?.invertida === true;
   // Avance de la meta: se deriva de sus indicadores (cascada 16.07); si no
-  // tiene indicadores, cae al avance propio de la meta.
-  const av = avanceMeta(indicadores, calcularPorcentajeMeta(meta));
+  // tiene indicadores, cae al avance propio de la meta. Considera el plazo.
+  const av = avanceMetaEnPlazo(
+    indicadores,
+    calcularPorcentajeMeta(meta),
+    { fecha_inicio: meta.fecha_inicio, fecha_limite: meta.fecha_limite },
+    hoy
+  );
   const pct = av.pct;
   const metaEstado = av.estado;
   const metaTieneSeg = av.conDatos > 0;
@@ -43,6 +54,9 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
         nombre: nombreEdit,
         unidad_medida: unidadEdit || null,
         valor_meta: metaEdit.trim() !== "" && isFinite(Number(metaEdit)) ? Number(metaEdit) : null,
+        fecha_inicio: inicioEdit || null,
+        fecha_limite: limiteEdit || null,
+        peso: pesoEdit.trim() !== "" && isFinite(Number(pesoEdit)) ? Number(pesoEdit) : null,
       });
       if (r.success) setEditing(false);
       else setEditError(r.error ?? "Error");
@@ -83,6 +97,42 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
             className="w-32 text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground"
           />
         </div>
+        <div className="flex gap-2">
+          <label className="flex-1 text-[10px] text-muted">
+            Inicio del plazo
+            <input
+              type="date"
+              value={inicioEdit}
+              onChange={(e) => setInicioEdit(e.target.value)}
+              className="mt-0.5 w-full text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground"
+            />
+          </label>
+          <label className="flex-1 text-[10px] text-muted">
+            Fin del plazo
+            <input
+              type="date"
+              value={limiteEdit}
+              onChange={(e) => setLimiteEdit(e.target.value)}
+              className="mt-0.5 w-full text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground"
+            />
+          </label>
+          <label className="w-24 text-[10px] text-muted">
+            Peso
+            <input
+              type="number"
+              step="any"
+              min="0"
+              max="100"
+              value={pesoEdit}
+              onChange={(e) => setPesoEdit(e.target.value)}
+              placeholder="1-100"
+              className="mt-0.5 w-full text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground"
+            />
+          </label>
+        </div>
+        <p className="text-[10px] text-muted">
+          El peso es el &quot;valor particular&quot; de la meta: pondera cuánto influye en el avance global.
+        </p>
         {editError && <p className="text-xs text-danger">{editError}</p>}
         <div className="flex gap-2">
           <button
@@ -188,13 +238,14 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
         </div>
       </div>
 
-      {meta.fecha_limite && (
-        <p className="text-[10px] text-muted mt-2">
-          Fecha límite: {formatFecha(meta.fecha_limite)}
+      {(meta.fecha_inicio || meta.fecha_limite || meta.peso != null || metaPropioSeg) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-muted">
+          <PlazoBadge inicio={meta.fecha_inicio} fin={meta.fecha_limite} hoy={hoy} />
+          {meta.peso != null && <span>Peso: {meta.peso}</span>}
           {metaPropioSeg && meta.ultima_actualizacion && (
-            <> · Última actualización: {formatFechaRelativa(meta.ultima_actualizacion)}</>
+            <span>Última actualización: {formatFechaRelativa(meta.ultima_actualizacion)}</span>
           )}
-        </p>
+        </div>
       )}
 
       {/* Panel de indicadores (siempre visible; el botón "+ Agregar" sólo si puede cargar) */}

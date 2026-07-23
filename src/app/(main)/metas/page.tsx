@@ -1,7 +1,8 @@
 import { getPeriodoActivo, getProyectos, getUnidades, getMetasDelPeriodo, getIndicadores } from "@/lib/queries";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { calcularPorcentajeMeta, avanceMeta, type AvanceNivel } from "@/lib/utils";
+import { calcularPorcentajeMeta, avanceMetaEnPlazo, type AvanceNivel } from "@/lib/utils";
+import { PlazoBadge } from "@/components/ui/plazo-badge";
 import type { Indicador, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 
@@ -28,9 +29,18 @@ export default async function MetasPage({ searchParams }: Props) {
   for (const i of indicadores as Indicador[]) {
     if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
   }
+  const hoy = new Date().toISOString().slice(0, 10);
   const avByMeta = new Map<string, AvanceNivel>();
   for (const m of metas) {
-    avByMeta.set(m.id, avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)));
+    avByMeta.set(
+      m.id,
+      avanceMetaEnPlazo(
+        indByMeta.get(m.id) ?? [],
+        calcularPorcentajeMeta(m),
+        { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+        hoy
+      )
+    );
   }
 
   if (params.q) {
@@ -81,9 +91,10 @@ export default async function MetasPage({ searchParams }: Props) {
                 <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
                   {m.nombre}
                 </h3>
-                {py && (
-                  <p className="text-xs text-muted mt-0.5">{py.nombre}</p>
-                )}
+                <div className="flex items-center gap-2 mt-0.5">
+                  {py && <p className="text-xs text-muted line-clamp-1">{py.nombre}</p>}
+                  <PlazoBadge inicio={m.fecha_inicio} fin={m.fecha_limite} hoy={hoy} mostrarRango={false} />
+                </div>
               </div>
               <div className="w-28 hidden md:block">
                 {tieneSeg ? (

@@ -331,6 +331,101 @@ export function avanceGlobalPorEstado(dist: {
   return Math.round((dist.verde * 100 + dist.amarillo * 50) / total);
 }
 
+// ---------------------------------------------------------------------------
+// Variable tiempo (correcciones 23.07): el avance considera el PLAZO.
+// Regla "cumplió dentro del plazo":
+//   * antes de fecha_inicio  → Programado (no cuenta aún)
+//   * dentro del plazo       → avance normal según progreso
+//   * venció y llegó al 100% → verde (cumplió)
+//   * venció sin llegar      → rojo, aunque tenga avance parcial
+// El "hoy" (YYYY-MM-DD) se calcula en el servidor y se pasa como argumento;
+// no se materializa en BD porque el estado por plazo cambia día a día.
+// ---------------------------------------------------------------------------
+
+export type EstadoPlazo = "sin_plazo" | "programado" | "vigente" | "vencido";
+
+// Comparación lexicográfica de fechas ISO "YYYY-MM-DD" (válida para ese formato).
+export function estadoPlazo(
+  inicio: string | null | undefined,
+  fin: string | null | undefined,
+  hoy: string
+): EstadoPlazo {
+  if (!inicio && !fin) return "sin_plazo";
+  if (inicio && hoy < inicio) return "programado";
+  if (fin && hoy > fin) return "vencido";
+  return "vigente";
+}
+
+type IndicadorConPlazo = Parameters<typeof avanceIndicador>[0] & {
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+};
+
+// % del indicador para promediar considerando el plazo: null si aún no arrancó
+// (Programado); si no, el avance real (que ya vale 100 cuando alcanzó objetivo).
+export function avanceIndicadorEnPlazo(ind: IndicadorConPlazo, hoy: string): number | null {
+  if (estadoPlazo(ind.fecha_inicio, ind.fecha_fin, hoy) === "programado") return null;
+  return avanceIndicador(ind);
+}
+
+// Semáforo del indicador (badge) considerando el plazo.
+export function estadoIndicadorEnPlazo(
+  ind: IndicadorConPlazo & { valor_actual_texto: string | null },
+  hoy: string
+): EstadoSemaforo {
+  const plazo = estadoPlazo(ind.fecha_inicio, ind.fecha_fin, hoy);
+  if (plazo === "programado") return "sin_datos"; // se muestra como "Programado"
+  if (plazo === "vencido") {
+    const pct = avanceIndicador(ind);
+    return pct != null && pct >= 100 ? "verde" : "rojo"; // venció sin cumplir → rojo
+  }
+  return estadoVisualIndicador(ind); // vigente / sin_plazo → regla actual
+}
+
+// Variante de avanceMeta que considera el plazo. Si la meta tiene indicadores,
+// promedia sus avances plazo-aware. Si no, aplica la regla de plazo sobre el
+// periodo de la propia meta ([fecha_inicio, fecha_limite]).
+export function avanceMetaEnPlazo(
+  indicadores: IndicadorConPlazo[],
+  metaPropioPct: number | null,
+  metaPlazo: { fecha_inicio: string | null; fecha_limite: string | null },
+  hoy: string
+): AvanceNivel {
+  if (indicadores.length > 0) {
+    return avanceAgregado(indicadores.map((i) => avanceIndicadorEnPlazo(i, hoy)));
+  }
+  const plazo = estadoPlazo(metaPlazo.fecha_inicio, metaPlazo.fecha_limite, hoy);
+  if (plazo === "programado") {
+    return { pct: null, estado: "sin_datos", conDatos: 0, total: 0 };
+  }
+  const conDatos = metaPropioPct != null ? 1 : 0;
+  if (plazo === "vencido") {
+    const cumplio = metaPropioPct != null && metaPropioPct >= 100;
+    return { pct: metaPropioPct, estado: cumplio ? "verde" : "rojo", conDatos, total: 0 };
+  }
+  return { pct: metaPropioPct, estado: estadoDeAvance(metaPropioPct), conDatos, total: 0 };
+}
+
+// Avance global = promedio del grado de avance de las metas ponderado por su
+// "valor particular" (meta.peso). Las metas sin peso pesan 1; las metas sin dato
+// (pct null) no cuentan. Devuelve null si ninguna meta tiene dato. (Correcciones
+// 23.07 pág. 18: el avance global se mide por las metas, no por cantidad de
+// proyectos por estado.)
+export function avanceGlobalPonderado(
+  metas: { pct: number | null; peso: number | null }[]
+): number | null {
+  let sumaPond = 0;
+  let sumaPesos = 0;
+  for (const m of metas) {
+    if (m.pct == null) continue;
+    const peso = m.peso != null && m.peso > 0 ? m.peso : 1;
+    sumaPond += m.pct * peso;
+    sumaPesos += peso;
+  }
+  if (sumaPesos === 0) return null;
+  return Math.round(sumaPond / sumaPesos);
+}
+
 // Devuelve el subárbol de unidades (raíz + descendientes) a partir de un id.
 // Si rootId es null, devuelve todas. Útil para acotar filtros al área del usuario.
 export function subtreeUnidades<T extends { id: string; parent_id: string | null }>(

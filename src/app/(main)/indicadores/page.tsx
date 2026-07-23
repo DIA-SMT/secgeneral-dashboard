@@ -3,7 +3,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IndicadoresFiltros } from "@/components/indicadores/indicadores-filtros";
 import { getPerfilActual } from "@/lib/auth";
-import { esRolGlobal, subtreeUnidades, estadoVisualIndicador } from "@/lib/utils";
+import { esRolGlobal, subtreeUnidades, estadoIndicadorEnPlazo } from "@/lib/utils";
+import { PlazoBadge } from "@/components/ui/plazo-badge";
 import type { Indicador, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -36,6 +37,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
     : subtreeUnidades(unidades, perfil?.unidad_id ?? null);
   const proyectoUnidad = new Map(proyectos.map((p) => [p.id, p.unidad]));
   const unidadById = new Map(unidades.map((u) => [u.id, u]));
+  const hoy = new Date().toISOString().slice(0, 10);
 
   // Helper para encontrar la Secretaría ancestro de cualquier unidad
   const findSecretaria = (unidadId: string): UnidadOrganizacional | null => {
@@ -56,7 +58,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
     );
   }
   if (params.estado && params.estado !== "todos") {
-    filtrados = filtrados.filter((i) => estadoVisualIndicador(i) === params.estado);
+    filtrados = filtrados.filter((i) => estadoIndicadorEnPlazo(i, hoy) === params.estado);
   }
   if (params.unidad) {
     const descendientes = (id: string): string[] => {
@@ -163,7 +165,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
                           className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-surface hover:bg-surface-hover hover:border-primary/30 transition-all group"
                         >
                           <div className="w-16 shrink-0">
-                            <StatusBadge estado={estadoVisualIndicador(ind)} />
+                            <StatusBadge estado={estadoIndicadorEnPlazo(ind, hoy)} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -175,6 +177,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
                               <h3 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
                                 {ind.nombre}
                               </h3>
+                              <PlazoBadge inicio={ind.fecha_inicio} fin={ind.fecha_fin} hoy={hoy} mostrarRango={false} />
                             </div>
                             {ind.meta && (
                               <p className="text-[10px] text-muted mt-0.5 line-clamp-1">

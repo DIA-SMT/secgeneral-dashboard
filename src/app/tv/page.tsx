@@ -1,6 +1,6 @@
 import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { CircularProgress } from "@/components/ui/circular-progress";
-import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, avanceMeta, avanceAgregado, avanceGlobalPorEstado, type AvanceNivel } from "@/lib/utils";
+import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, avanceMetaEnPlazo, avanceAgregado, avanceGlobalPonderado, type AvanceNivel } from "@/lib/utils";
 import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
 import { TvClock } from "./tv-clock";
 import Image from "next/image";
@@ -14,29 +14,41 @@ export default async function TvPage() {
   const indicadores = await getIndicadores();
 
   const proyectosActivos = resumen.proyectos.filter((p) => p.estado === "activo");
+  const hoy = new Date().toISOString().slice(0, 10);
 
   // Avance por proyecto vía cascada (indicadores → metas → proyecto), igual que
-  // el Panel Ejecutivo, para que ambas pantallas muestren lo mismo.
+  // el Panel Ejecutivo, para que ambas pantallas muestren lo mismo. Considera el plazo.
   const indByMeta = new Map<string, Indicador[]>();
   for (const i of indicadores as Indicador[]) {
     if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
   }
   const avancePorProyecto = new Map<string, AvanceNivel>();
+  const metasGlobal: { pct: number | null; peso: number | null }[] = [];
   for (const py of proyectosActivos) {
     const metasPy = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
-    const pcts = metasPy.map((m) => avanceMeta(indByMeta.get(m.id) ?? [], calcularPorcentajeMeta(m)).pct);
+    const pcts = metasPy.map(
+      (m) =>
+        avanceMetaEnPlazo(
+          indByMeta.get(m.id) ?? [],
+          calcularPorcentajeMeta(m),
+          { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
+          hoy
+        ).pct
+    );
     avancePorProyecto.set(py.id, avanceAgregado(pcts));
+    metasPy.forEach((m, idx) => metasGlobal.push({ pct: pcts[idx], peso: m.peso }));
   }
 
-  // Avance global ponderado por CANTIDAD de proyectos por estado (finalizado
-  // 100 %, en ejecución 50 %, sobre el total).
+  // Avance global = promedio del grado de avance de las metas ponderado por su
+  // "valor particular" (meta.peso). La distribución por proyectos se usa solo
+  // para saber si hay seguimiento y el color del anillo.
   const distribucionProyectos = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
   for (const py of proyectosActivos) {
     const av = avancePorProyecto.get(py.id);
     if (!av || av.conDatos === 0) distribucionProyectos.sin_datos++;
     else distribucionProyectos[av.estado as "verde" | "amarillo" | "rojo"]++;
   }
-  const porcentajeGlobal = avanceGlobalPorEstado(distribucionProyectos);
+  const porcentajeGlobal = avanceGlobalPonderado(metasGlobal);
   const tieneSeguimientoGlobal =
     distribucionProyectos.verde + distribucionProyectos.amarillo + distribucionProyectos.rojo > 0;
 

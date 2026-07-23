@@ -4,7 +4,8 @@ import { BackButton } from "@/components/layout/back-button";
 import { IndicadorCargaForm } from "@/components/indicadores/indicador-carga-form";
 import { IndicadorAccionesBar } from "@/components/indicadores/indicador-acciones-bar";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { estadoVisualIndicador } from "@/lib/utils";
+import { estadoIndicadorEnPlazo } from "@/lib/utils";
+import { PlazoBadge } from "@/components/ui/plazo-badge";
 import type { Indicador, Meta, Proyecto, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -30,6 +31,7 @@ export default async function IndicadorDetallePage({
 
   const ind = data as Indicador & { meta?: Meta & { proyecto?: Proyecto & { unidad?: UnidadOrganizacional } } };
   const proyecto = ind.meta?.proyecto;
+  const hoy = new Date().toISOString().slice(0, 10);
 
   const perfil = await getPerfilActual();
   let puedeCargar = false;
@@ -74,11 +76,12 @@ export default async function IndicadorDetallePage({
       <div className="rounded-xl border border-border bg-surface p-6">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <StatusBadge estado={estadoVisualIndicador(ind)} />
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <StatusBadge estado={estadoIndicadorEnPlazo(ind, hoy)} />
               {ind.codigo && (
                 <span className="text-xs font-mono text-muted bg-border/50 px-2 py-0.5 rounded">{ind.codigo}</span>
               )}
+              <PlazoBadge inicio={ind.fecha_inicio} fin={ind.fecha_fin} hoy={hoy} />
             </div>
             <h1 className="text-xl font-bold text-foreground">{ind.nombre}</h1>
             {ind.descripcion && (
@@ -148,6 +151,8 @@ export default async function IndicadorDetallePage({
               unidadMedida={ind.unidad_medida}
               valorObjetivo={ind.valor_objetivo}
               valorObjetivoTexto={ind.valor_objetivo_texto}
+              fechaInicio={ind.fecha_inicio}
+              fechaFin={ind.fecha_fin}
               tieneValor={
                 ind.valor_actual != null ||
                 (ind.valor_actual_texto != null && ind.valor_actual_texto.trim() !== "")

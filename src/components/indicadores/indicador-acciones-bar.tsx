@@ -11,6 +11,8 @@ interface Props {
   unidadMedida: string | null;
   valorObjetivo: number | null;
   valorObjetivoTexto: string | null;
+  fechaInicio: string | null;
+  fechaFin: string | null;
   tieneValor: boolean;
 }
 
@@ -21,6 +23,8 @@ export function IndicadorAccionesBar({
   unidadMedida,
   valorObjetivo,
   valorObjetivoTexto,
+  fechaInicio,
+  fechaFin,
   tieneValor,
 }: Props) {
   const router = useRouter();
@@ -29,6 +33,8 @@ export function IndicadorAccionesBar({
   const [unidadEdit, setUnidadEdit] = useState(unidadMedida ?? "");
   const [objetivoNum, setObjetivoNum] = useState(valorObjetivo?.toString() ?? "");
   const [objetivoTxt, setObjetivoTxt] = useState(valorObjetivoTexto ?? "");
+  const [fechaInicioEdit, setFechaInicioEdit] = useState(fechaInicio ?? "");
+  const [fechaFinEdit, setFechaFinEdit] = useState(fechaFin ?? "");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +72,8 @@ export function IndicadorAccionesBar({
         unidad_medida: unidadEdit || null,
         valor_objetivo: objetivoNum ? Number(objetivoNum) : null,
         valor_objetivo_texto: objetivoTxt || null,
+        fecha_inicio: fechaInicioEdit || null,
+        fecha_fin: fechaFinEdit || null,
         proyecto_id: proyectoId,
       });
       if (r.success) setEditMeta(false);
@@ -148,6 +156,30 @@ export function IndicadorAccionesBar({
           <p className="text-[10px] text-muted">
             Usá objetivo numérico si la meta tiene una cifra concreta. Usá texto si es Sí/No o
             cualitativo. Para borrar uno, dejá el campo vacío.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-muted uppercase tracking-wider">Inicio del plazo</label>
+              <input
+                type="date"
+                value={fechaInicioEdit}
+                onChange={(e) => setFechaInicioEdit(e.target.value)}
+                className="mt-1 w-full text-sm bg-surface border border-border rounded px-2 py-1 text-foreground"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted uppercase tracking-wider">Fin del plazo</label>
+              <input
+                type="date"
+                value={fechaFinEdit}
+                onChange={(e) => setFechaFinEdit(e.target.value)}
+                className="mt-1 w-full text-sm bg-surface border border-border rounded px-2 py-1 text-foreground"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted">
+            El plazo define cómo se mide el avance: si el indicador llega al objetivo dentro del
+            período es verde; si vence sin alcanzarlo, rojo.
           </p>
           <div className="flex gap-2">
             <button
