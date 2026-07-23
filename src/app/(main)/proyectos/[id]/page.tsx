@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { MetaCardWithForm } from "@/components/dashboard/meta-card-with-form";
 import { NuevaMetaForm } from "@/components/dashboard/nueva-meta-form";
+import { ProyectoAcciones } from "@/components/dashboard/proyecto-acciones";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
@@ -104,6 +105,11 @@ export default async function ProyectoDetallePage({
             <p className="text-sm text-muted mt-1">{proyecto.unidad?.nombre_corto ?? proyecto.unidad?.nombre}</p>
             {proyecto.objetivo && (
               <p className="text-sm text-muted/80 mt-2 max-w-2xl">{proyecto.objetivo}</p>
+            )}
+            {puedeCargar && (
+              <div className="mt-3">
+                <ProyectoAcciones proyectoId={proyecto.id} nombreActual={proyecto.nombre} />
+              </div>
             )}
           </div>
           <div className="flex items-center gap-6 shrink-0">

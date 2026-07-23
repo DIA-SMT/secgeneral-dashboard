@@ -3,7 +3,7 @@
 import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "./supabase/server";
-import { requireValidacionSobreUnidad, requireRol, getPerfilActual } from "./auth";
+import { requireValidacionSobreUnidad, requireRol, getPerfilActual, getScopeUnidades } from "./auth";
 import { textoEsVacio, textoEsCero, avanceIndicador, avanceAgregado } from "./utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RolUsuario } from "@/types/database";
@@ -945,6 +945,103 @@ export async function crearProyecto(input: {
   revalidatePath("/proyectos");
   revalidatePath("/dashboard");
   return { success: true, id: (data as { id: string }).id };
+}
+
+const ROLES_EDICION_PROYECTO = ["director", "subsecretario", "secretario", "admin_funcional"];
+
+// Verifica que el usuario tenga permiso sobre el proyecto (rol + ámbito).
+// admin_funcional/admin_tecnico tienen alcance global; el resto queda acotado
+// a las unidades de su ámbito.
+async function autorizarSobreProyecto(
+  proyectoId: string
+): Promise<
+  | { ok: true; sb: SupabaseClient; unidadId: string }
+  | { ok: false; error: string }
+> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { ok: false, error: "No autenticado" };
+  if (!ROLES_EDICION_PROYECTO.includes(perfil.rol)) {
+    return { ok: false, error: "Sin permisos sobre proyectos" };
+  }
+  const sb = await getSupabaseServer();
+  const { data: py, error } = await sb
+    .from("proyecto")
+    .select("id, unidad_id")
+    .eq("id", proyectoId)
+    .is("deleted_at", null)
+    .single();
+  if (error || !py) return { ok: false, error: "Proyecto no encontrado" };
+  const unidadId = (py as { unidad_id: string }).unidad_id;
+
+  const alcanceGlobal = perfil.rol === "admin_funcional" || perfil.rol === "admin_tecnico";
+  if (!alcanceGlobal) {
+    const scope = new Set(await getScopeUnidades(perfil));
+    if (!scope.has(unidadId)) {
+      return { ok: false, error: "El proyecto no pertenece a tu ámbito" };
+    }
+  }
+  return { ok: true, sb, unidadId };
+}
+
+export async function editarProyecto(input: { proyecto_id: string; nombre: string }) {
+  if (!input.nombre?.trim()) {
+    return { success: false, error: "El nombre del proyecto no puede quedar vacío" };
+  }
+  const auth = await autorizarSobreProyecto(input.proyecto_id);
+  if (!auth.ok) return { success: false, error: auth.error };
+
+  const { error } = await auth.sb
+    .from("proyecto")
+    .update({ nombre: input.nombre.trim() })
+    .eq("id", input.proyecto_id);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath(`/proyectos/${input.proyecto_id}`);
+  revalidatePath("/proyectos");
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+// Borrado lógico del proyecto. Cascada a metas e indicadores para que no queden
+// contando en los KPI globales del panel.
+export async function eliminarProyecto(input: { proyecto_id: string }) {
+  const auth = await autorizarSobreProyecto(input.proyecto_id);
+  if (!auth.ok) return { success: false, error: auth.error };
+  const sb = auth.sb;
+  const ahora = new Date().toISOString();
+
+  // Indicadores de las metas del proyecto
+  const { data: metas } = await sb
+    .from("meta")
+    .select("id")
+    .eq("proyecto_id", input.proyecto_id)
+    .is("deleted_at", null);
+  const metaIds = (metas ?? []).map((m) => (m as { id: string }).id);
+  if (metaIds.length > 0) {
+    const { error: errInd } = await sb
+      .from("indicador")
+      .update({ deleted_at: ahora })
+      .in("meta_id", metaIds)
+      .is("deleted_at", null);
+    if (errInd) return { success: false, error: errInd.message };
+  }
+
+  const { error: errMeta } = await sb
+    .from("meta")
+    .update({ deleted_at: ahora })
+    .eq("proyecto_id", input.proyecto_id)
+    .is("deleted_at", null);
+  if (errMeta) return { success: false, error: errMeta.message };
+
+  const { error: errPy } = await sb
+    .from("proyecto")
+    .update({ deleted_at: ahora })
+    .eq("id", input.proyecto_id);
+  if (errPy) return { success: false, error: errPy.message };
+
+  revalidatePath("/proyectos");
+  revalidatePath("/dashboard");
+  return { success: true };
 }
 
 export async function crearMeta(input: {

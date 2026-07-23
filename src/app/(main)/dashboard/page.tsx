@@ -1,15 +1,15 @@
 import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { CircularProgress } from "@/components/ui/circular-progress";
-import { SemaforoSummary } from "@/components/ui/semaforo-summary";
+import { SemaforoGauge } from "@/components/ui/semaforo-gauge";
+import { KpiBreakdownTooltip } from "@/components/ui/kpi-breakdown-tooltip";
 import { ProyectoCard } from "@/components/dashboard/proyecto-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatFecha, calcularPorcentajeMeta, avanceMeta, avanceAgregado, avanceGlobalPorEstado, type AvanceNivel } from "@/lib/utils";
+import { calcularPorcentajeMeta, avanceMeta, avanceAgregado, avanceGlobalPorEstado, type AvanceNivel } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
-import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
+import type { Meta, Indicador } from "@/types/database";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -137,14 +137,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   const tieneSeguimiento =
     distribucionGlobal.verde + distribucionGlobal.amarillo + distribucionGlobal.rojo > 0;
 
-  const estadoGlobal: EstadoSemaforo = !tieneSeguimiento
-    ? "sin_datos"
-    : porcentajeGlobal != null && porcentajeGlobal >= 70
-    ? "verde"
-    : porcentajeGlobal != null && porcentajeGlobal >= 40
-    ? "amarillo"
-    : "rojo";
-
   // Agrupar por subsecretaria
   const subsecretarias = unidades.filter((u) => u.nivel === 1);
 
@@ -212,78 +204,61 @@ export default async function DashboardPage({ searchParams }: Props) {
       {/* KPIs: Avance global → Proyectos → Metas → Indicadores */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="sm:col-span-2 lg:col-span-1 rounded-2xl border border-border bg-surface p-6 flex items-center gap-6">
-          {tieneSeguimiento && porcentajeGlobal != null ? (
-            <CircularProgress value={porcentajeGlobal} estado={estadoGlobal} size={110} strokeWidth={10} />
-          ) : (
-            <div className="h-[110px] w-[110px] rounded-full border-[10px] border-border/30 flex items-center justify-center shrink-0">
-              <span className="text-2xl font-light text-muted/40">—</span>
-            </div>
-          )}
+          <SemaforoGauge
+            centerValue={tieneSeguimiento ? porcentajeGlobal : null}
+            segments={[
+              { estado: "verde", count: distribucionGlobal.verde },
+              { estado: "amarillo", count: distribucionGlobal.amarillo },
+              { estado: "rojo", count: distribucionGlobal.rojo },
+              { estado: "sin_datos", count: distribucionGlobal.sin_datos },
+            ]}
+            size={110}
+            strokeWidth={10}
+          />
           <div>
             <p className="text-xs text-muted uppercase tracking-widest font-medium">Avance Global</p>
-            {tieneSeguimiento && porcentajeGlobal != null ? (
-              <p className="text-lg font-semibold text-foreground mt-1">{porcentajeGlobal}% ejecutado</p>
-            ) : (
+            {!tieneSeguimiento && (
               <p className="text-sm text-muted/70 mt-1">Aguardando primer reporte</p>
             )}
           </div>
         </div>
 
-        <Link href={buildHref("/proyectos", "dir")} className="block hover:scale-[1.02] transition-transform">
+        <Link href={buildHref("/proyectos", "dir")} className="relative group block hover:scale-[1.02] transition-transform">
           <KpiCard label="Proyectos" value={proyectosActivos.length}
             sublabel={`de ${proyectosScope.length} en POA`}
             accent="success" />
+          <KpiBreakdownTooltip
+            verde={distribucionProyectos.verde}
+            amarillo={distribucionProyectos.amarillo}
+            rojo={distribucionProyectos.rojo}
+            sin_datos={distribucionProyectos.sin_datos} />
         </Link>
 
-        <Link href={buildHref("/metas", "unidad")} className="block hover:scale-[1.02] transition-transform">
+        <Link href={buildHref("/metas", "unidad")} className="relative group block hover:scale-[1.02] transition-transform">
           <KpiCard label="Metas" value={metasScope.length}
             sublabel={resumen.tieneSeguimiento
               ? `${metasSemaforoScope.verde} finalizadas · ${metasSemaforoScope.rojo} no iniciadas`
               : "Pendientes de seguimiento"}
             accent="accent" />
+          <KpiBreakdownTooltip
+            verde={metasSemaforoScope.verde}
+            amarillo={metasSemaforoScope.amarillo}
+            rojo={metasSemaforoScope.rojo}
+            sin_datos={metasSemaforoScope.sin_datos} />
         </Link>
 
-        <Link href={buildHref("/indicadores", "unidad")} className="block hover:scale-[1.02] transition-transform">
+        <Link href={buildHref("/indicadores", "unidad")} className="relative group block hover:scale-[1.02] transition-transform">
           <KpiCard label="Indicadores" value={indicadoresStats.total}
             sublabel={indicadoresStats.total > 0
               ? `${indicadoresStats.semaforo.verde} en verde · ${indicadoresStats.semaforo.rojo} en rojo`
               : "Sin indicadores en este ámbito"}
             accent="primary" />
+          <KpiBreakdownTooltip
+            verde={indicadoresStats.semaforo.verde}
+            amarillo={indicadoresStats.semaforo.amarillo}
+            rojo={indicadoresStats.semaforo.rojo}
+            sin_datos={indicadoresStats.semaforo.sin_datos} />
         </Link>
-      </div>
-
-      {/* Grado de avance + proximo hito */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-border bg-surface p-5">
-          <p className="text-xs text-muted uppercase tracking-widest mb-3">Grado de avance de los proyectos</p>
-          <SemaforoSummary
-            verde={distribucionProyectos.verde}
-            amarillo={distribucionProyectos.amarillo}
-            rojo={distribucionProyectos.rojo}
-            sin_datos={distribucionProyectos.sin_datos}
-            label="proyectos" />
-        </div>
-
-        {resumen.proximoHito?.fecha_esperada ? (
-          <div className="rounded-2xl border border-accent/20 bg-accent/5 p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-accent uppercase tracking-widest font-medium">Próximo hito</p>
-              <p className="text-base font-semibold text-foreground mt-1">{resumen.proximoHito.nombre}</p>
-            </div>
-            <p className="text-xl font-bold text-accent shrink-0 ml-4">{formatFecha(resumen.proximoHito.fecha_esperada)}</p>
-          </div>
-        ) : resumen.hitosVencidos > 0 ? (
-          <div className="rounded-2xl border border-warning/20 bg-warning/5 p-5 flex items-center gap-3">
-            <div>
-              <p className="text-sm font-semibold text-warning">{resumen.hitosVencidos} hitos con fecha vencida</p>
-              <p className="text-xs text-muted mt-0.5">Revisar en la vista de Hitos</p>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-border bg-surface p-5 flex items-center justify-center">
-            <p className="text-sm text-muted">Sin hitos próximos</p>
-          </div>
-        )}
       </div>
 
       {/* Proyectos */}

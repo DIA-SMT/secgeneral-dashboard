@@ -75,11 +75,19 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
             className="w-full text-sm bg-background border border-border rounded px-3 py-2 mt-0.5"
           >
             <option value="">Seleccionar...</option>
-            {direcciones.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nombre_corto ?? u.nombre}
-              </option>
-            ))}
+            {direcciones.map((u) => {
+              // Indentación por nivel para leer la jerarquía (Secretaría → Dir).
+              const sangria = "  ".repeat(Math.max(0, u.nivel));
+              const etiqueta =
+                u.nivel === 0 ? " (Secretaría)" : u.nivel === 1 ? " (Subsecretaría)" : "";
+              return (
+                <option key={u.id} value={u.id}>
+                  {sangria}
+                  {u.nombre_corto ?? u.nombre}
+                  {etiqueta}
+                </option>
+              );
+            })}
           </select>
         </div>
       )}

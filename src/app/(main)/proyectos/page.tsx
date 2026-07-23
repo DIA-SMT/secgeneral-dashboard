@@ -80,6 +80,11 @@ export default async function ProyectosPage({ searchParams }: Props) {
   const sortByName = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>
     (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre);
 
+  // Para el desplegable de "Nuevo proyecto": secretaría → subsecretarías →
+  // direcciones, y alfabético dentro de cada nivel.
+  const sortByNivelNombre = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>
+    a.nivel - b.nivel || sortByName(a, b);
+
   const proyectosPorUnidad = new Map<string, typeof proyectosFiltrados>();
   for (const py of proyectosFiltrados) {
     (proyectosPorUnidad.get(py.unidad_id) ?? proyectosPorUnidad.set(py.unidad_id, []).get(py.unidad_id)!).push(py);
@@ -190,12 +195,12 @@ export default async function ProyectosPage({ searchParams }: Props) {
             direcciones={
               perfil.rol === "admin_funcional"
                 ? unidades
-                    .filter((u) => u.nivel >= 2)
-                    .sort((a, b) => (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre))
+                    .filter((u) => u.nivel >= 0)
+                    .sort(sortByNivelNombre)
                 : perfil.rol === "secretario" || perfil.rol === "subsecretario"
                 ? unidades
-                    .filter((u) => u.nivel >= 2 && scopeUnidadesUsuario?.has(u.id))
-                    .sort((a, b) => (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre))
+                    .filter((u) => u.nivel >= 0 && scopeUnidadesUsuario?.has(u.id))
+                    .sort(sortByNivelNombre)
                 : []
             }
           />
