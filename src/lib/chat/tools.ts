@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { avanceIndicador, avanceAgregado } from "@/lib/utils";
+import { avanceIndicador, avanceAgregado, coincideBusqueda, normalizarBusqueda } from "@/lib/utils";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // -------------------------------------------------------
@@ -38,9 +38,10 @@ export async function buscarProyectos(params: {
   let results = (proyectos ?? []) as any[];
 
   if (params.texto) {
-    const t = params.texto.toLowerCase();
+    // Sin distinguir mayúsculas, tildes ni puntuación (28.07)
+    const t = normalizarBusqueda(params.texto);
     results = results.filter(
-      (p) => p.nombre.toLowerCase().includes(t) || p.codigo?.toLowerCase().includes(t)
+      (p) => coincideBusqueda(p.nombre, t) || coincideBusqueda(p.codigo, t)
     );
   }
 

@@ -1,13 +1,20 @@
 import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { SemaforoGauge } from "@/components/ui/semaforo-gauge";
-import { KpiBreakdownTooltip } from "@/components/ui/kpi-breakdown-tooltip";
 import { ProyectoCard } from "@/components/dashboard/proyecto-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { EmptyState } from "@/components/ui/empty-state";
-import { calcularPorcentajeMeta, avanceMetaEnPlazo, avanceAgregado, avanceGlobalPonderado, type AvanceNivel } from "@/lib/utils";
+import {
+  calcularPorcentajeMeta,
+  avanceMetaEnPlazo,
+  avanceAgregado,
+  avanceGlobalPorConteo,
+  porcentajeDeEstado,
+  totalDistribucion,
+  type AvanceNivel,
+} from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
 import type { Meta, Indicador } from "@/types/database";
 import { Suspense } from "react";
@@ -52,15 +59,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   const metasScope = scopeUnidadIds
     ? resumen.metas.filter((m) => proyectoIdsScope.has(m.proyecto_id))
     : resumen.metas;
-  const metasSemaforoScope = {
-    verde: metasScope.filter((m) => m.estado_semaforo === "verde").length,
-    amarillo: metasScope.filter((m) => m.estado_semaforo === "amarillo").length,
-    rojo: metasScope.filter((m) => m.estado_semaforo === "rojo").length,
-    sin_datos: metasScope.filter(
-      (m) => m.estado_semaforo === "sin_datos" || m.estado_semaforo === "gris"
-    ).length,
-  };
-
   const proyectosActivos = proyectosScope.filter((p) => p.estado === "activo");
 
   // -------------------------------------------------------
@@ -84,15 +82,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       })
     : (indicadores as IndConRel[]);
 
-  const indicadoresStats = {
-    total: indScope.length,
-    semaforo: {
-      verde: indScope.filter((i) => i.estado_semaforo === "verde").length,
-      amarillo: indScope.filter((i) => i.estado_semaforo === "amarillo").length,
-      rojo: indScope.filter((i) => i.estado_semaforo === "rojo").length,
-      sin_datos: indScope.filter((i) => i.estado_semaforo === "sin_datos" || i.estado_semaforo === "gris").length,
-    },
-  };
+  const totalIndicadoresScope = indScope.length;
 
   const hoy = new Date().toISOString().slice(0, 10);
 
@@ -137,30 +127,48 @@ export default async function DashboardPage({ searchParams }: Props) {
     proyectosFiltrados = proyectosActivos.filter((py) => estadoProyecto(py) === params.estado);
   }
 
-  // Avance global = promedio del grado de avance de las metas ponderado por su
-  // "valor particular" (meta.peso), sobre las metas de los proyectos filtrados
-  // (correcciones 23.07 pág. 18). Los segmentos del anillo siguen mostrando la
-  // distribución por cantidad de proyectos por estado.
-  const distribucionGlobal = distribucion(proyectosFiltrados);
-  const idsFiltrados = new Set(proyectosFiltrados.map((p) => p.id));
-  const metasGlobal = metasScope.filter((m) => idsFiltrados.has(m.proyecto_id));
-  const porcentajeGlobal = avanceGlobalPonderado(
-    metasGlobal.map((m) => ({
-      pct: avanceMetaEnPlazo(
-        indByMeta.get(m.id) ?? [],
-        calcularPorcentajeMeta(m),
-        { fecha_inicio: m.fecha_inicio, fecha_limite: m.fecha_limite },
-        hoy
-      ).pct,
-      peso: m.peso,
-    }))
-  );
-  // Hay seguimiento si al menos un proyecto del conjunto tiene datos cargados.
-  const tieneSeguimiento =
-    distribucionGlobal.verde + distribucionGlobal.amarillo + distribucionGlobal.rojo > 0;
+  // -------------------------------------------------------
+  // Avance global (correcciones 28.07)
+  // -------------------------------------------------------
+  // Se mide porcentualmente por CONTEO de proyectos: finalizados + en ejecución
+  // sobre el total del ámbito. El anillo muestra la proporción de cada estado
+  // (y al pasar el mouse, su porcentaje).
+  //
+  // Con un filtro de estado aplicado, el anillo muestra SOLO ese color y el
+  // número del centro pasa a ser el porcentaje de ese color sobre el total.
+  const ESTADOS_GAUGE = ["verde", "amarillo", "rojo", "sin_datos"] as const;
+  const estadoFiltro =
+    ESTADOS_GAUGE.find((e) => e === params.estado) ?? null;
 
-  // Agrupar por subsecretaria
-  const subsecretarias = unidades.filter((u) => u.nivel === 1);
+  const totalAmbito = totalDistribucion(distribucionProyectos);
+  const porcentajeGlobal = estadoFiltro
+    ? porcentajeDeEstado(distribucionProyectos, estadoFiltro)
+    : avanceGlobalPorConteo(distribucionProyectos);
+
+  const segmentosGauge = estadoFiltro
+    ? [{ estado: estadoFiltro, count: distribucionProyectos[estadoFiltro] }]
+    : ([
+        { estado: "verde", count: distribucionProyectos.verde },
+        { estado: "amarillo", count: distribucionProyectos.amarillo },
+        { estado: "rojo", count: distribucionProyectos.rojo },
+        { estado: "sin_datos", count: distribucionProyectos.sin_datos },
+      ] as const);
+
+  // Hay seguimiento si al menos un proyecto del ámbito tiene datos cargados.
+  const tieneSeguimiento =
+    distribucionProyectos.verde + distribucionProyectos.amarillo + distribucionProyectos.rojo > 0;
+
+  // Cantidades que se muestran debajo de la rueda del KPI de avance global.
+  const conteosRueda = [
+    { estado: "verde" as const, label: "finalizados", count: distribucionProyectos.verde, dot: "bg-success" },
+    { estado: "amarillo" as const, label: "en ejecución", count: distribucionProyectos.amarillo, dot: "bg-warning" },
+    { estado: "rojo" as const, label: "no iniciados", count: distribucionProyectos.rojo, dot: "bg-info" },
+    { estado: "sin_datos" as const, label: "sin datos", count: distribucionProyectos.sin_datos, dot: "bg-primary/30" },
+  ];
+
+  // Agrupar por Secretaría: las direcciones que cuelgan directo de una
+  // secretaría (sin subsecretaría) también tienen que aparecer.
+  const secretarias = unidades.filter((u) => u.nivel === 0);
 
   const scopeUnidad = scopeId ? unidades.find((u) => u.id === scopeId) ?? null : null;
 
@@ -169,6 +177,15 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Las cards llevan a su sección arrastrando los filtros del panel:
   // el ámbito (scope) mapeado al parámetro de cada página y el estado/semáforo.
   const estadoParam = params.estado && params.estado !== "todos" ? params.estado : null;
+
+  // Fija el ámbito del panel sin perder el filtro de estado.
+  const buildScopeHref = (unidadId: string) => {
+    const sp = new URLSearchParams();
+    sp.set("scope", unidadId);
+    if (estadoParam) sp.set("estado", estadoParam);
+    return `/dashboard?${sp.toString()}`;
+  };
+
   const buildHref = (base: string, areaKey: "dir" | "unidad") => {
     const sp = new URLSearchParams();
     if (scopeId) sp.set(areaKey, scopeId);
@@ -225,61 +242,49 @@ export default async function DashboardPage({ searchParams }: Props) {
 
       {/* KPIs: Avance global → Proyectos → Metas → Indicadores */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="sm:col-span-2 lg:col-span-1 rounded-2xl border border-border bg-surface p-6 flex items-center gap-6">
+        <div className="sm:col-span-2 lg:col-span-1 rounded-2xl border border-border bg-surface p-6 flex flex-col items-center gap-3">
+          <p className="text-xs text-muted uppercase tracking-widest font-medium self-start">
+            Avance Global
+          </p>
           <SemaforoGauge
             centerValue={tieneSeguimiento ? porcentajeGlobal : null}
-            segments={[
-              { estado: "verde", count: distribucionGlobal.verde },
-              { estado: "amarillo", count: distribucionGlobal.amarillo },
-              { estado: "rojo", count: distribucionGlobal.rojo },
-              { estado: "sin_datos", count: distribucionGlobal.sin_datos },
-            ]}
+            segments={[...segmentosGauge]}
+            totalReferencia={totalAmbito}
             size={110}
             strokeWidth={10}
           />
-          <div>
-            <p className="text-xs text-muted uppercase tracking-widest font-medium">Avance Global</p>
-            {!tieneSeguimiento && (
-              <p className="text-sm text-muted/70 mt-1">Aguardando primer reporte</p>
-            )}
-          </div>
+          {tieneSeguimiento ? (
+            /* Cantidad de proyectos clasificados, debajo de la rueda (28.07) */
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+              {conteosRueda
+                .filter((c) => c.count > 0)
+                .map((c) => (
+                  <span
+                    key={c.estado}
+                    className="inline-flex items-center gap-1.5 text-[11px] text-muted"
+                    title={`${c.count} de ${totalAmbito} proyectos`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${c.dot}`} />
+                    <span className="font-semibold text-foreground">{c.count}</span>
+                    {c.label}
+                  </span>
+                ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted/70">Aguardando primer reporte</p>
+          )}
         </div>
 
-        <Link href={buildHref("/proyectos", "dir")} className="relative group block hover:scale-[1.02] transition-transform">
-          <KpiCard label="Proyectos" value={proyectosActivos.length}
-            sublabel={`de ${proyectosScope.length} en POA`}
-            accent="success" />
-          <KpiBreakdownTooltip
-            verde={distribucionProyectos.verde}
-            amarillo={distribucionProyectos.amarillo}
-            rojo={distribucionProyectos.rojo}
-            sin_datos={distribucionProyectos.sin_datos} />
+        <Link href={buildHref("/proyectos", "dir")} className="block hover:scale-[1.02] transition-transform">
+          <KpiCard label="Proyectos" value={proyectosActivos.length} accent="success" />
         </Link>
 
-        <Link href={buildHref("/metas", "unidad")} className="relative group block hover:scale-[1.02] transition-transform">
-          <KpiCard label="Metas" value={metasScope.length}
-            sublabel={resumen.tieneSeguimiento
-              ? `${metasSemaforoScope.verde} finalizadas · ${metasSemaforoScope.rojo} no iniciadas`
-              : "Pendientes de seguimiento"}
-            accent="accent" />
-          <KpiBreakdownTooltip
-            verde={metasSemaforoScope.verde}
-            amarillo={metasSemaforoScope.amarillo}
-            rojo={metasSemaforoScope.rojo}
-            sin_datos={metasSemaforoScope.sin_datos} />
+        <Link href={buildHref("/metas", "unidad")} className="block hover:scale-[1.02] transition-transform">
+          <KpiCard label="Metas" value={metasScope.length} accent="accent" />
         </Link>
 
-        <Link href={buildHref("/indicadores", "unidad")} className="relative group block hover:scale-[1.02] transition-transform">
-          <KpiCard label="Indicadores" value={indicadoresStats.total}
-            sublabel={indicadoresStats.total > 0
-              ? `${indicadoresStats.semaforo.verde} en verde · ${indicadoresStats.semaforo.rojo} en rojo`
-              : "Sin indicadores en este ámbito"}
-            accent="primary" />
-          <KpiBreakdownTooltip
-            verde={indicadoresStats.semaforo.verde}
-            amarillo={indicadoresStats.semaforo.amarillo}
-            rojo={indicadoresStats.semaforo.rojo}
-            sin_datos={indicadoresStats.semaforo.sin_datos} />
+        <Link href={buildHref("/indicadores", "unidad")} className="block hover:scale-[1.02] transition-transform">
+          <KpiCard label="Indicadores" value={totalIndicadoresScope} accent="primary" />
         </Link>
       </div>
 
@@ -306,31 +311,39 @@ export default async function DashboardPage({ searchParams }: Props) {
           </div>
         ) : (
           <div className="space-y-8">
-            {subsecretarias.map((sub) => {
-              const allUnitIds = descendientes(sub.id);
-              const pysSub = proyectosFiltrados.filter((p) => allUnitIds.includes(p.unidad_id));
-              if (pysSub.length === 0) return null;
+            {secretarias.map((sec) => {
+              const allUnitIds = descendientes(sec.id);
+              const pysSec = proyectosFiltrados.filter((p) => allUnitIds.includes(p.unidad_id));
+              if (pysSec.length === 0) return null;
+              const nombreSec = sec.nombre_corto ?? sec.nombre;
               return (
-                <div key={sub.id}>
-                  <div className="flex items-center gap-2 mb-4">
+                <div key={sec.id}>
+                  {/* Click en la secretaría → fija el ámbito, y el ámbito ya
+                      alimenta todos los KPI y gráficos del panel (28.07). */}
+                  <Link
+                    href={buildScopeHref(sec.id)}
+                    className="flex items-center gap-2 mb-4 group w-fit"
+                  >
                     <div className="h-6 w-6 rounded-md bg-accent/20 flex items-center justify-center">
-                      <span className="text-accent text-xs font-bold">{sub.nombre_corto?.[0]}</span>
+                      <span className="text-accent text-xs font-bold">{nombreSec[0]}</span>
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground">{sub.nombre_corto}</h3>
-                    <span className="text-xs text-muted">— {pysSub.length} proyectos</span>
-                  </div>
+                    <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {nombreSec}
+                    </h3>
+                    <span className="text-xs text-muted">— {pysSec.length} proyectos</span>
+                  </Link>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {pysSub.slice(0, 9).map((py) => {
+                    {pysSec.slice(0, 9).map((py) => {
                       const metas = (resumen.metasPorProyecto.get(py.id) ?? []) as Meta[];
                       const av = avancePorProyecto.get(py.id);
                       return <ProyectoCard key={py.id} proyecto={py} metas={metas}
                         avance={av ? { porcentaje: av.pct, estado: av.estado, tieneSeguimiento: av.conDatos > 0 } : undefined} />;
                     })}
                   </div>
-                  {pysSub.length > 9 && (
-                    <Link href={`/dashboard?scope=${sub.id}`}
+                  {pysSec.length > 9 && (
+                    <Link href={buildScopeHref(sec.id)}
                       className="inline-block mt-3 text-xs text-primary hover:text-primary-light transition-colors">
-                      Ver los {pysSub.length} proyectos →
+                      Ver los {pysSec.length} proyectos →
                     </Link>
                   )}
                 </div>

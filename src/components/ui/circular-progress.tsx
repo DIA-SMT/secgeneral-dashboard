@@ -3,7 +3,7 @@ import type { EstadoSemaforo } from "@/types/database";
 const strokeColors: Record<EstadoSemaforo, string> = {
   verde: "#10B981",
   amarillo: "#F59E0B",
-  rojo: "#EF4444",
+  rojo: "#38BDF8", // No iniciado → celeste (28.07)
   gris: "#6B7280",
   sin_datos: "#374151",
 };

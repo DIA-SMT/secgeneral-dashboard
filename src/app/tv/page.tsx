@@ -1,6 +1,6 @@
 import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { CircularProgress } from "@/components/ui/circular-progress";
-import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, avanceMetaEnPlazo, avanceAgregado, avanceGlobalPonderado, type AvanceNivel } from "@/lib/utils";
+import { formatFecha, formatFechaRelativa, calcularPorcentajeMeta, semaforoColor, avanceMetaEnPlazo, avanceAgregado, avanceGlobalPorConteo, type AvanceNivel } from "@/lib/utils";
 import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
 import { TvClock } from "./tv-clock";
 import Image from "next/image";
@@ -39,16 +39,16 @@ export default async function TvPage() {
     metasPy.forEach((m, idx) => metasGlobal.push({ pct: pcts[idx], peso: m.peso }));
   }
 
-  // Avance global = promedio del grado de avance de las metas ponderado por su
-  // "valor particular" (meta.peso). La distribución por proyectos se usa solo
-  // para saber si hay seguimiento y el color del anillo.
+  // Avance global (28.07): conteo de proyectos finalizados + en ejecución sobre
+  // el total. Misma fórmula que el Panel Ejecutivo para que ambas pantallas
+  // muestren lo mismo.
   const distribucionProyectos = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
   for (const py of proyectosActivos) {
     const av = avancePorProyecto.get(py.id);
     if (!av || av.conDatos === 0) distribucionProyectos.sin_datos++;
     else distribucionProyectos[av.estado as "verde" | "amarillo" | "rojo"]++;
   }
-  const porcentajeGlobal = avanceGlobalPonderado(metasGlobal);
+  const porcentajeGlobal = avanceGlobalPorConteo(distribucionProyectos);
   const tieneSeguimientoGlobal =
     distribucionProyectos.verde + distribucionProyectos.amarillo + distribucionProyectos.rojo > 0;
 
@@ -138,9 +138,9 @@ export default async function TvPage() {
 
         {/* Semaforo visual */}
         <div className="col-span-6 row-span-1 rounded-2xl border border-border bg-surface flex items-center gap-6 px-8">
-          <SemaforoBlock color="bg-success" count={resumen.metasSemaforo.verde} label="Al día" total={resumen.totalMetas} />
+          <SemaforoBlock color="bg-success" count={resumen.metasSemaforo.verde} label="Finalizadas" total={resumen.totalMetas} />
           <SemaforoBlock color="bg-warning" count={resumen.metasSemaforo.amarillo} label="En ejecución" total={resumen.totalMetas} />
-          <SemaforoBlock color="bg-danger" count={resumen.metasSemaforo.rojo} label="En riesgo" total={resumen.totalMetas} />
+          <SemaforoBlock color="bg-info" count={resumen.metasSemaforo.rojo} label="No iniciadas" total={resumen.totalMetas} />
           <SemaforoBlock color="bg-primary/30" count={resumen.metasSemaforo.sin_datos} label="Pendientes" total={resumen.totalMetas} />
         </div>
 
@@ -162,19 +162,19 @@ export default async function TvPage() {
           {resumen.tieneSeguimiento && proyectosCriticos.length > 0 ? (
             <>
               <div className="flex items-center gap-2 mb-4">
-                <span className="h-3 w-3 rounded-full bg-danger" />
-                <h2 className="text-lg font-semibold text-foreground">Proyectos en Riesgo</h2>
+                <span className="h-3 w-3 rounded-full bg-info" />
+                <h2 className="text-lg font-semibold text-foreground">Proyectos No Iniciados</h2>
               </div>
               <div className="flex-1 space-y-3 overflow-hidden">
                 {proyectosCriticos.slice(0, 4).map((py) => {
                   const porcentaje = avancePorProyecto.get(py.id)?.pct ?? null;
                   return (
-                    <div key={py.id} className="flex items-center justify-between rounded-xl bg-danger/5 border border-danger/10 px-5 py-3">
+                    <div key={py.id} className="flex items-center justify-between rounded-xl bg-info/5 border border-info/10 px-5 py-3">
                       <div>
                         <p className="text-base font-semibold text-foreground">{py.nombre}</p>
                         <p className="text-sm text-muted">{py.unidad?.nombre_corto}</p>
                       </div>
-                      <p className="text-3xl font-bold text-danger">{porcentaje ?? 0}%</p>
+                      <p className="text-3xl font-bold text-info">{porcentaje ?? 0}%</p>
                     </div>
                   );
                 })}

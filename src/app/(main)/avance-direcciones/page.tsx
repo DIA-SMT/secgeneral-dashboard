@@ -161,7 +161,7 @@ export default async function AvanceDireccionesPage() {
 function DireccionRow({ resumen }: { resumen: ResumenDireccion }) {
   const pct = resumen.promedioPct;
   const barColor =
-    pct == null ? "bg-muted/30" : pct >= 100 ? "bg-success" : pct > 0 ? "bg-warning" : "bg-danger";
+    pct == null ? "bg-muted/30" : pct >= 100 ? "bg-success" : pct > 0 ? "bg-warning" : "bg-info";
 
   return (
     <div className="rounded-lg border border-border bg-surface p-3">
@@ -198,7 +198,7 @@ function DireccionRow({ resumen }: { resumen: ResumenDireccion }) {
         )}
         {resumen.semaforo.rojo > 0 && (
           <span className="flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-danger" /> {resumen.semaforo.rojo} no iniciados
+            <span className="h-1.5 w-1.5 rounded-full bg-info" /> {resumen.semaforo.rojo} no iniciados
           </span>
         )}
         {resumen.semaforo.sin_datos > 0 && (

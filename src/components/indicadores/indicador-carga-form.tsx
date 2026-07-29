@@ -242,11 +242,11 @@ export function IndicadorCargaForm({
                 onClick={() => setEstadoTexto("rojo")}
                 className={`text-xs px-3 py-1 rounded border ${
                   estadoTexto === "rojo"
-                    ? "bg-danger/20 text-danger border-danger/30"
+                    ? "bg-info/20 text-info border-info/30"
                     : "border-border text-muted"
                 }`}
               >
-                🔴 No iniciado
+                🔵 No iniciado
               </button>
             </div>
           </div>

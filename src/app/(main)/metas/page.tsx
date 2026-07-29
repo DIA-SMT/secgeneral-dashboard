@@ -1,7 +1,13 @@
 import { getPeriodoActivo, getProyectos, getUnidades, getMetasDelPeriodo, getIndicadores } from "@/lib/queries";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { calcularPorcentajeMeta, avanceMetaEnPlazo, type AvanceNivel } from "@/lib/utils";
+import {
+  calcularPorcentajeMeta,
+  avanceMetaEnPlazo,
+  coincideBusqueda,
+  normalizarBusqueda,
+  type AvanceNivel,
+} from "@/lib/utils";
 import { PlazoBadge } from "@/components/ui/plazo-badge";
 import type { Indicador, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
@@ -44,8 +50,9 @@ export default async function MetasPage({ searchParams }: Props) {
   }
 
   if (params.q) {
-    const q = params.q.toLowerCase();
-    metas = metas.filter((m) => m.nombre.toLowerCase().includes(q));
+    // Búsqueda sin distinguir mayúsculas, tildes ni puntuación (28.07)
+    const q = normalizarBusqueda(params.q);
+    metas = metas.filter((m) => coincideBusqueda(m.nombre, q));
   }
   if (params.estado && params.estado !== "todos") {
     metas = metas.filter((m) => avByMeta.get(m.id)?.estado === params.estado);
@@ -93,7 +100,8 @@ export default async function MetasPage({ searchParams }: Props) {
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
                   {py && <p className="text-xs text-muted line-clamp-1">{py.nombre}</p>}
-                  <PlazoBadge inicio={m.fecha_inicio} fin={m.fecha_limite} hoy={hoy} mostrarRango={false} />
+                  <PlazoBadge inicio={m.fecha_inicio} fin={m.fecha_limite} hoy={hoy}
+                    mostrarRango={false} cumplido={pct != null && pct >= 100} />
                 </div>
               </div>
               <div className="w-28 hidden md:block">

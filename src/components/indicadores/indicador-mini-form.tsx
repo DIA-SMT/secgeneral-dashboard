@@ -62,7 +62,7 @@ export function IndicadoresPanel({
               <span className={`h-2 w-2 rounded-full shrink-0 ${
                 ind.estado_semaforo === "verde" ? "bg-success" :
                 ind.estado_semaforo === "amarillo" ? "bg-warning" :
-                ind.estado_semaforo === "rojo" ? "bg-danger" : "bg-muted/40"
+                ind.estado_semaforo === "rojo" ? "bg-info" : "bg-muted/40"
               }`} />
               <span className="flex-1 min-w-0 line-clamp-1">{ind.nombre}</span>
               {editingId === ind.id ? (

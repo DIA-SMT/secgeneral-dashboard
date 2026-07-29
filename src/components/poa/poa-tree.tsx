@@ -347,7 +347,7 @@ function IndicadorRow({
               : ind.estado_semaforo === "amarillo"
               ? "bg-warning"
               : ind.estado_semaforo === "rojo"
-              ? "bg-danger"
+              ? "bg-info"
               : "bg-muted/40"
           }`}
         />

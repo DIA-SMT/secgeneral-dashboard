@@ -3,7 +3,14 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IndicadoresFiltros } from "@/components/indicadores/indicadores-filtros";
 import { getPerfilActual } from "@/lib/auth";
-import { esRolGlobal, subtreeUnidades, estadoIndicadorEnPlazo } from "@/lib/utils";
+import {
+  coincideBusqueda,
+  esRolGlobal,
+  estadoIndicadorEnPlazo,
+  indicadorCumplido,
+  normalizarBusqueda,
+  subtreeUnidades,
+} from "@/lib/utils";
 import { PlazoBadge } from "@/components/ui/plazo-badge";
 import type { Indicador, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
@@ -49,12 +56,13 @@ export default async function IndicadoresPage({ searchParams }: Props) {
   let filtrados = indicadores as IndicadorJoined[];
 
   if (params.q) {
-    const q = params.q.toLowerCase();
+    // Búsqueda sin distinguir mayúsculas, tildes ni puntuación (28.07)
+    const q = normalizarBusqueda(params.q);
     filtrados = filtrados.filter(
       (i) =>
-        i.nombre.toLowerCase().includes(q) ||
-        i.codigo?.toLowerCase().includes(q) ||
-        i.meta?.nombre.toLowerCase().includes(q)
+        coincideBusqueda(i.nombre, q) ||
+        coincideBusqueda(i.codigo, q) ||
+        coincideBusqueda(i.meta?.nombre, q)
     );
   }
   if (params.estado && params.estado !== "todos") {
@@ -177,7 +185,8 @@ export default async function IndicadoresPage({ searchParams }: Props) {
                               <h3 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
                                 {ind.nombre}
                               </h3>
-                              <PlazoBadge inicio={ind.fecha_inicio} fin={ind.fecha_fin} hoy={hoy} mostrarRango={false} />
+                              <PlazoBadge inicio={ind.fecha_inicio} fin={ind.fecha_fin} hoy={hoy}
+                                mostrarRango={false} cumplido={indicadorCumplido(ind)} />
                             </div>
                             {ind.meta && (
                               <p className="text-[10px] text-muted mt-0.5 line-clamp-1">

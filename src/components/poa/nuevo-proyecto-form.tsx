@@ -28,7 +28,7 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
       return;
     }
     if (esAdmin && !unidadId) {
-      setError("Elegí la dirección del proyecto.");
+      setError("Elegí el área del proyecto (secretaría, subsecretaría o dirección).");
       return;
     }
     startTransition(async () => {
@@ -68,7 +68,9 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
       )}
       {esAdmin && (
         <div>
-          <label className="text-[10px] text-muted uppercase tracking-wider">Dirección</label>
+          <label className="text-[10px] text-muted uppercase tracking-wider">
+            Área del proyecto
+          </label>
           <select
             value={unidadId}
             onChange={(e) => setUnidadId(e.target.value)}
@@ -89,6 +91,10 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
               );
             })}
           </select>
+          <p className="text-[10px] text-muted mt-1">
+            Elegí la Secretaría si el proyecto es de la Secretaría y no de una
+            dirección en particular.
+          </p>
         </div>
       )}
       <div>

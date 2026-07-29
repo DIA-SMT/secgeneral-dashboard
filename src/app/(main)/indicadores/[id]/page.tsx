@@ -4,7 +4,7 @@ import { BackButton } from "@/components/layout/back-button";
 import { IndicadorCargaForm } from "@/components/indicadores/indicador-carga-form";
 import { IndicadorAccionesBar } from "@/components/indicadores/indicador-acciones-bar";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { estadoIndicadorEnPlazo } from "@/lib/utils";
+import { estadoIndicadorEnPlazo, indicadorCumplido } from "@/lib/utils";
 import { PlazoBadge } from "@/components/ui/plazo-badge";
 import type { Indicador, Meta, Proyecto, UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
@@ -81,7 +81,8 @@ export default async function IndicadorDetallePage({
               {ind.codigo && (
                 <span className="text-xs font-mono text-muted bg-border/50 px-2 py-0.5 rounded">{ind.codigo}</span>
               )}
-              <PlazoBadge inicio={ind.fecha_inicio} fin={ind.fecha_fin} hoy={hoy} />
+              <PlazoBadge inicio={ind.fecha_inicio} fin={ind.fecha_fin} hoy={hoy}
+                cumplido={indicadorCumplido(ind)} />
             </div>
             <h1 className="text-xl font-bold text-foreground">{ind.nombre}</h1>
             {ind.descripcion && (

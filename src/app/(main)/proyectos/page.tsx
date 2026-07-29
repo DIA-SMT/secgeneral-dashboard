@@ -1,6 +1,12 @@
 import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores, getMetasDelPeriodo } from "@/lib/queries";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
-import { calcularAvancePorIndicadores, esRolGlobal, subtreeUnidades } from "@/lib/utils";
+import {
+  calcularAvancePorIndicadores,
+  coincideBusqueda,
+  esRolGlobal,
+  normalizarBusqueda,
+  subtreeUnidades,
+} from "@/lib/utils";
 import type { Meta, UnidadOrganizacional, Indicador } from "@/types/database";
 import { ProyectosSearch } from "./search";
 import { PoaTree, type PoaIndicador, type PoaMeta, type PoaProyecto } from "@/components/poa/poa-tree";
@@ -50,13 +56,14 @@ export default async function ProyectosPage({ searchParams }: Props) {
   // Filtrado
   let proyectosFiltrados = proyectos;
   if (params.q) {
-    const q = params.q.toLowerCase();
+    // Búsqueda sin distinguir mayúsculas, tildes ni puntuación (28.07)
+    const q = normalizarBusqueda(params.q);
     proyectosFiltrados = proyectosFiltrados.filter(
       (p) =>
-        p.nombre.toLowerCase().includes(q) ||
-        p.codigo?.toLowerCase().includes(q) ||
-        p.unidad?.nombre_corto?.toLowerCase().includes(q) ||
-        p.unidad?.nombre.toLowerCase().includes(q)
+        coincideBusqueda(p.nombre, q) ||
+        coincideBusqueda(p.codigo, q) ||
+        coincideBusqueda(p.unidad?.nombre_corto, q) ||
+        coincideBusqueda(p.unidad?.nombre, q)
     );
   }
   if (params.dir) {

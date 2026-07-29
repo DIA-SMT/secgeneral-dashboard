@@ -33,7 +33,7 @@ export function FilterBar({ unidades: _unidades }: { unidades?: UnidadOrganizaci
             todos: active ? "bg-primary/20 text-primary border-primary/30" : "",
             verde: active ? "bg-success/20 text-success border-success/30" : "",
             amarillo: active ? "bg-warning/20 text-warning border-warning/30" : "",
-            rojo: active ? "bg-danger/20 text-danger border-danger/30" : "",
+            rojo: active ? "bg-info/20 text-info border-info/30" : "",
           };
           const labels: Record<string, string> = {
             todos: "Todos",

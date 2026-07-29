@@ -34,7 +34,7 @@ export function ProyectosSearch({ unidades }: { unidades: UnidadOrganizacional[]
     todos: "bg-primary/20 text-primary border-primary/30",
     verde: "bg-success/20 text-success border-success/30",
     amarillo: "bg-warning/20 text-warning border-warning/30",
-    rojo: "bg-danger/20 text-danger border-danger/30",
+    rojo: "bg-info/20 text-info border-info/30",
   };
 
   return (

@@ -1,16 +1,17 @@
 type EstadoGauge = "verde" | "amarillo" | "rojo" | "sin_datos";
 
+// "rojo" (No iniciado) se pinta en celeste desde el 28.07.
 const COLORS: Record<EstadoGauge, string> = {
   verde: "#10B981",
   amarillo: "#F59E0B",
-  rojo: "#EF4444",
+  rojo: "#38BDF8",
   sin_datos: "#374151",
 };
 
 const LABELS: Record<EstadoGauge, string> = {
-  verde: "Verde",
-  amarillo: "Amarillo",
-  rojo: "Rojo",
+  verde: "Finalizado",
+  amarillo: "En ejecución",
+  rojo: "No iniciado",
   sin_datos: "Sin datos",
 };
 
@@ -24,6 +25,12 @@ interface SemaforoGaugeProps {
   segments: GaugeSegment[];
   /** Valor mostrado en el centro (avance global %). null => "—". */
   centerValue: number | null;
+  /**
+   * Denominador para los porcentajes del tooltip. Por defecto es la suma de los
+   * segmentos; cuando hay un filtro de estado aplicado se pasa el total del
+   * ámbito completo para que el porcentaje siga siendo sobre el total real.
+   */
+  totalReferencia?: number;
   size?: number;
   strokeWidth?: number;
 }
@@ -36,12 +43,15 @@ interface SemaforoGaugeProps {
 export function SemaforoGauge({
   segments,
   centerValue,
+  totalReferencia,
   size = 110,
   strokeWidth = 10,
 }: SemaforoGaugeProps) {
   const radius = (size - strokeWidth) / 2;
   const circ = radius * 2 * Math.PI;
-  const total = segments.reduce((s, x) => s + x.count, 0);
+  const suma = segments.reduce((s, x) => s + x.count, 0);
+  const totalArco = suma; // proporción del anillo
+  const totalPct = totalReferencia ?? suma; // denominador de los porcentajes
 
   let acc = 0; // fracción de circunferencia ya consumida
 
@@ -60,14 +70,14 @@ export function SemaforoGauge({
           strokeWidth={strokeWidth}
           fill="none"
         />
-        {total > 0 &&
+        {totalArco > 0 &&
           segments
             .filter((s) => s.count > 0)
             .map((s) => {
-              const frac = s.count / total;
+              const frac = s.count / totalArco;
               const len = frac * circ;
               const offset = -acc * circ;
-              const pct = Math.round(frac * 100);
+              const pct = totalPct > 0 ? Math.round((s.count / totalPct) * 100) : 0;
               acc += frac;
               return (
                 <circle

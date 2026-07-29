@@ -69,6 +69,10 @@ const EMAILS_RAW = [
   "loreradrizzani78@gmail.com",
   "oliveranacarolina@gmail.com",
   "luchochlain@hotmail.com",
+  // Pedido 28/07/2026: Director de Comunicación y Director de Comunicación
+  // no tradicional. Falta asignarles rol/área desde /admin/usuarios.
+  "sangelzazzali@gmail.com",
+  "gabriellemme18@gmail.com",
 ];
 
 const emails = Array.from(

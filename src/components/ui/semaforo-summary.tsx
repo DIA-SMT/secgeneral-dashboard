@@ -18,7 +18,7 @@ export function SemaforoSummary({
     <div className="flex items-center gap-4">
       <SemaforoItem color="bg-success" count={verde} label="FINALIZADO" />
       <SemaforoItem color="bg-warning" count={amarillo} label="EN EJECUCIÓN" />
-      <SemaforoItem color="bg-danger" count={rojo} label="NO INICIADO" />
+      <SemaforoItem color="bg-info" count={rojo} label="NO INICIADO" />
       {sin_datos > 0 && (
         <SemaforoItem color="bg-primary/30" count={sin_datos} label="Sin datos" />
       )}

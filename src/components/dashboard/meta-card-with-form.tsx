@@ -240,7 +240,8 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
 
       {(meta.fecha_inicio || meta.fecha_limite || meta.peso != null || metaPropioSeg) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-muted">
-          <PlazoBadge inicio={meta.fecha_inicio} fin={meta.fecha_limite} hoy={hoy} />
+          <PlazoBadge inicio={meta.fecha_inicio} fin={meta.fecha_limite} hoy={hoy}
+            cumplido={av.pct != null && av.pct >= 100} />
           {meta.peso != null && <span>Peso: {meta.peso}</span>}
           {metaPropioSeg && meta.ultima_actualizacion && (
             <span>Última actualización: {formatFechaRelativa(meta.ultima_actualizacion)}</span>

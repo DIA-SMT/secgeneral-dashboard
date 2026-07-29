@@ -4,11 +4,13 @@ import type { EstadoSemaforo } from "@/types/database";
 // Helpers de presentacion
 // -------------------------------------------------------
 
+// El estado "rojo" (No iniciado) se pinta en azul/celeste desde el 28.07: el
+// rojo quedó reservado para errores y acciones destructivas.
 export function semaforoColor(estado: EstadoSemaforo): string {
   const map: Record<EstadoSemaforo, string> = {
     verde: "bg-success",
     amarillo: "bg-warning",
-    rojo: "bg-danger",
+    rojo: "bg-info",
     gris: "bg-muted/40",
     sin_datos: "bg-primary/20",
   };
@@ -32,11 +34,35 @@ export function semaforoTextColor(estado: EstadoSemaforo): string {
   const map: Record<EstadoSemaforo, string> = {
     verde: "text-success",
     amarillo: "text-warning",
-    rojo: "text-danger",
+    rojo: "text-info",
     gris: "text-muted",
     sin_datos: "text-primary/70",
   };
   return map[estado] ?? "text-muted";
+}
+
+// ---------------------------------------------------------------------------
+// Normalización para los motores de búsqueda (correcciones 28.07): la búsqueda
+// no debe distinguir mayúsculas/minúsculas, ni tildes, ni el punto final y las
+// comas. Se aplica tanto al término buscado como al texto donde se busca.
+// ---------------------------------------------------------------------------
+export function normalizarBusqueda(t: string | null | undefined): string {
+  return (t ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "") // saca tildes y diéresis
+    .toLowerCase()
+    .replace(/[.,;:!?'"()[\]\-¡¿“”]/g, " ") // puntuación → espacio
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// true si `texto` contiene el término buscado, ignorando caso, tildes y puntuación.
+export function coincideBusqueda(
+  texto: string | null | undefined,
+  termino: string
+): boolean {
+  if (!termino) return true;
+  return normalizarBusqueda(texto).includes(termino);
 }
 
 // Texto que en realidad representa "sin valor" (placeholders de importación:
@@ -332,6 +358,43 @@ export function avanceGlobalPorEstado(dist: {
 }
 
 // ---------------------------------------------------------------------------
+// Avance global (correcciones 28.07): se mide porcentualmente sumando los
+// proyectos FINALIZADOS + los EN EJECUCIÓN sobre el total de proyectos del
+// ámbito. No pondera por avance individual ni por peso de metas: es conteo.
+// Los "no iniciados" y los "sin datos" quedan fuera del numerador y su
+// porcentaje se ve en el anillo (celeste / gris).
+// ---------------------------------------------------------------------------
+
+export type DistribucionEstados = {
+  verde: number;
+  amarillo: number;
+  rojo: number;
+  sin_datos: number;
+};
+
+export function totalDistribucion(d: DistribucionEstados): number {
+  return d.verde + d.amarillo + d.rojo + d.sin_datos;
+}
+
+export function avanceGlobalPorConteo(d: DistribucionEstados): number | null {
+  const total = totalDistribucion(d);
+  if (total === 0) return null;
+  return Math.round(((d.verde + d.amarillo) / total) * 100);
+}
+
+// Porcentaje que representa UN estado sobre el total del ámbito. Se usa cuando
+// hay un filtro de estado aplicado: el anillo muestra solo ese color y el
+// número del centro pasa a ser el porcentaje de ese color.
+export function porcentajeDeEstado(
+  d: DistribucionEstados,
+  estado: keyof DistribucionEstados
+): number | null {
+  const total = totalDistribucion(d);
+  if (total === 0) return null;
+  return Math.round((d[estado] / total) * 100);
+}
+
+// ---------------------------------------------------------------------------
 // Variable tiempo (correcciones 23.07): el avance considera el PLAZO.
 // Regla "cumplió dentro del plazo":
 //   * antes de fecha_inicio  → Programado (no cuenta aún)
@@ -369,6 +432,9 @@ export function avanceIndicadorEnPlazo(ind: IndicadorConPlazo, hoy: string): num
 }
 
 // Semáforo del indicador (badge) considerando el plazo.
+// Correcciones 28.07: si el indicador ya está reportado como FINALIZADO, el
+// vencimiento del plazo no lo degrada. Estamos en instancia de corrección y
+// muchos finalizados se cargan tarde; no deben salir vencidos/no iniciados.
 export function estadoIndicadorEnPlazo(
   ind: IndicadorConPlazo & { valor_actual_texto: string | null },
   hoy: string
@@ -376,10 +442,20 @@ export function estadoIndicadorEnPlazo(
   const plazo = estadoPlazo(ind.fecha_inicio, ind.fecha_fin, hoy);
   if (plazo === "programado") return "sin_datos"; // se muestra como "Programado"
   if (plazo === "vencido") {
-    const pct = avanceIndicador(ind);
-    return pct != null && pct >= 100 ? "verde" : "rojo"; // venció sin cumplir → rojo
+    if (indicadorCumplido(ind)) return "verde";
+    return "rojo"; // venció sin cumplir → rojo (regla 23.07)
   }
   return estadoVisualIndicador(ind); // vigente / sin_plazo → regla actual
+}
+
+// true si el indicador ya llegó a su objetivo (o fue marcado como finalizado).
+// Se usa para no mostrar "Vencido" sobre algo que ya está cumplido.
+export function indicadorCumplido(
+  ind: IndicadorConPlazo & { valor_actual_texto?: string | null }
+): boolean {
+  if (ind.estado_semaforo === "verde") return true;
+  const pct = avanceIndicador(ind);
+  return pct != null && pct >= 100;
 }
 
 // Variante de avanceMeta que considera el plazo. Si la meta tiene indicadores,

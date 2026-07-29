@@ -172,11 +172,11 @@ export function IndicadorCargaInline({
                       ? "bg-success/20 text-success border-success/30"
                       : e === "amarillo"
                       ? "bg-warning/20 text-warning border-warning/30"
-                      : "bg-danger/20 text-danger border-danger/30"
+                      : "bg-info/20 text-info border-info/30"
                     : "border-border text-muted"
                 }`}
               >
-                {e === "verde" ? "🟢 Finalizado" : e === "amarillo" ? "🟡 En ejecución" : "🔴 No iniciado"}
+                {e === "verde" ? "🟢 Finalizado" : e === "amarillo" ? "🟡 En ejecución" : "🔵 No iniciado"}
               </button>
             ))}
           </div>

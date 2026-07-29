@@ -14,6 +14,9 @@
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
+  /* Semáforo "No iniciado": desde el 28.07 va en azul/celeste, no en rojo.
+     `danger` queda reservado para errores y acciones destructivas. */
+  --color-info: #38BDF8;
   --font-sans: 'Poppins', sans-serif;
 }
 
