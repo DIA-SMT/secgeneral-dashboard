@@ -423,9 +423,70 @@ export async function actualizarPerfil(input: {
   return { success: true };
 }
 
+// -------------------------------------------------------
+// Server Action: Eliminar un usuario (31.07)
+// -------------------------------------------------------
+// Borra la cuenta de Auth; el perfil se va solo por el ON DELETE CASCADE de
+// perfil_usuario. Lo que el usuario haya cargado (avances, agendas, fichas)
+// NO se borra: queda sin autor gracias a la migración 030.
+//
+// Es irreversible. Dos resguardos: no podés borrarte a vos mismo, y no se
+// puede dejar al sistema sin ningún administrador activo.
+export async function eliminarUsuario(input: { user_id: string }) {
+  let actual;
+  try {
+    actual = await requireRol("admin_funcional", "admin_tecnico");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  if (actual.user_id === input.user_id) {
+    return { success: false, error: "No podés eliminar tu propio usuario." };
+  }
+
+  const sb = await getSupabaseServer();
+  const { data: objetivo } = await sb
+    .from("perfil_usuario")
+    .select("rol, email, activo")
+    .eq("user_id", input.user_id)
+    .maybeSingle();
+
+  // Si el que se va es admin, que no sea el último que queda en pie.
+  const ROLES_ADMIN = ["admin_funcional", "admin_tecnico"];
+  if (objetivo && objetivo.activo && ROLES_ADMIN.includes(objetivo.rol as string)) {
+    const { count } = await sb
+      .from("perfil_usuario")
+      .select("user_id", { count: "exact", head: true })
+      .in("rol", ROLES_ADMIN)
+      .eq("activo", true);
+    if ((count ?? 0) <= 1) {
+      return {
+        success: false,
+        error: "Es el único administrador activo. Asigná otro antes de eliminarlo.",
+      };
+    }
+  }
+
+  const { getSupabaseAdmin } = await import("./supabase/admin");
+  const { error } = await getSupabaseAdmin().auth.admin.deleteUser(input.user_id);
+  if (error) {
+    // El caso típico es la migración 030 sin aplicar: alguna FK a auth.users
+    // sigue en NO ACTION y el borrado rebota contra la carga histórica.
+    return {
+      success: false,
+      error: `${error.message}. Si menciona una clave foránea, falta aplicar la migración 030.`,
+    };
+  }
+
+  revalidatePath("/admin/usuarios");
+  return { success: true };
+}
+
 export async function desactivarPerfil(user_id: string) {
   try {
-    await requireRol("admin_tecnico");
+    // 31.07: antes solo admin_tecnico. Si admin_funcional ya puede eliminar,
+    // no tiene sentido negarle la acción más suave.
+    await requireRol("admin_funcional", "admin_tecnico");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }

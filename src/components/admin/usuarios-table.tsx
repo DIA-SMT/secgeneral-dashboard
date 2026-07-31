@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { actualizarPerfil, desactivarPerfil } from "@/lib/actions";
+import { actualizarPerfil, desactivarPerfil, eliminarUsuario } from "@/lib/actions";
 import type { PerfilUsuario, UnidadOrganizacional, RolUsuario } from "@/types/database";
 
 const ROLES: { value: RolUsuario; label: string }[] = [
@@ -17,10 +17,11 @@ const ROLES: { value: RolUsuario; label: string }[] = [
 interface Props {
   perfiles: PerfilUsuario[];
   unidades: UnidadOrganizacional[];
-  rolActual: RolUsuario;
+  /** user_id del admin logueado: no puede eliminarse a sí mismo. */
+  userIdActual: string;
 }
 
-export function UsuariosTable({ perfiles, unidades, rolActual }: Props) {
+export function UsuariosTable({ perfiles, unidades, userIdActual }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
 
   const unidadesByNivel = (nivel: number) =>
@@ -50,7 +51,7 @@ export function UsuariosTable({ perfiles, unidades, rolActual }: Props) {
               editing={editing === p.user_id}
               onEdit={() => setEditing(p.user_id)}
               onCancel={() => setEditing(null)}
-              rolActual={rolActual}
+              userIdActual={userIdActual}
             />
           ))}
         </tbody>
@@ -71,7 +72,7 @@ function UsuarioRow({
   editing,
   onEdit,
   onCancel,
-  rolActual,
+  userIdActual,
 }: {
   perfil: PerfilUsuario;
   unidades: UnidadOrganizacional[];
@@ -79,12 +80,14 @@ function UsuarioRow({
   editing: boolean;
   onEdit: () => void;
   onCancel: () => void;
-  rolActual: RolUsuario;
+  /** user_id del admin logueado: no puede eliminarse a sí mismo. */
+  userIdActual: string;
 }) {
   const [rol, setRol] = useState<RolUsuario>(perfil.rol);
   const [unidadId, setUnidadId] = useState<string | null>(perfil.unidad_id);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
 
   const requierUnidad =
     rol === "secretario" || rol === "subsecretario" || rol === "director" || rol === "coordinador";
@@ -120,6 +123,17 @@ function UsuarioRow({
     if (!confirm(`Desactivar a ${perfil.nombre ?? perfil.email}?`)) return;
     startTransition(async () => {
       await desactivarPerfil(perfil.user_id);
+    });
+  };
+
+  // Eliminar es irreversible, así que va con confirmación en dos pasos en vez
+  // de un confirm() que se despacha de un click.
+  const eliminar = () => {
+    setError(null);
+    startTransition(async () => {
+      const r = await eliminarUsuario({ user_id: perfil.user_id });
+      if (!r.success) setError(r.error ?? "No se pudo eliminar");
+      else setConfirmandoBorrado(false);
     });
   };
 
@@ -188,14 +202,42 @@ function UsuarioRow({
               ✕
             </button>
           </div>
+        ) : confirmandoBorrado ? (
+          <div className="flex items-center gap-2 justify-end">
+            <span className="text-[10px] text-danger">¿Eliminar definitivamente?</span>
+            <button
+              onClick={eliminar}
+              disabled={isPending}
+              className="text-xs text-danger font-semibold hover:text-danger/80 disabled:opacity-50"
+            >
+              Sí, eliminar
+            </button>
+            <button
+              onClick={() => {
+                setConfirmandoBorrado(false);
+                setError(null);
+              }}
+              className="text-xs text-muted hover:text-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
         ) : (
           <div className="flex items-center gap-2 justify-end">
             <button onClick={onEdit} className="text-xs text-primary hover:text-primary-light">
               Editar
             </button>
-            {rolActual === "admin_tecnico" && perfil.activo && (
-              <button onClick={desactivar} className="text-xs text-danger hover:text-danger/80">
+            {perfil.activo && (
+              <button onClick={desactivar} className="text-xs text-warning hover:text-warning/80">
                 Desactivar
+              </button>
+            )}
+            {perfil.user_id !== userIdActual && (
+              <button
+                onClick={() => setConfirmandoBorrado(true)}
+                className="text-xs text-danger hover:text-danger/80"
+              >
+                Eliminar
               </button>
             )}
           </div>

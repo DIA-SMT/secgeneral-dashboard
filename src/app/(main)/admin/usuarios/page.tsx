@@ -80,7 +80,7 @@ export default async function AdminUsuariosPage() {
         <UsuariosSinAsignar usuarios={huerfanos} unidades={unidades} />
       )}
 
-      <UsuariosTable perfiles={perfiles} unidades={unidades} rolActual={perfil.rol} />
+      <UsuariosTable perfiles={perfiles} unidades={unidades} userIdActual={perfil.user_id} />
     </div>
   );
 }

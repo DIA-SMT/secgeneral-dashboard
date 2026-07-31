@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { crearPerfilParaUsuario } from "@/lib/actions";
+import { crearPerfilParaUsuario, eliminarUsuario } from "@/lib/actions";
 import type { UnidadOrganizacional, RolUsuario } from "@/types/database";
 import type { AuthUserOrphan } from "@/app/(main)/admin/usuarios/page";
 
@@ -53,6 +53,17 @@ function SinAsignarRow({
   const [unidadId, setUnidadId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
+
+  // Estas cuentas existen en Auth pero no tienen perfil: son las que más se
+  // acumulan (pruebas, altas mal cargadas) y las que más se quieren limpiar.
+  const eliminar = () => {
+    setError(null);
+    startTransition(async () => {
+      const r = await eliminarUsuario({ user_id: usuario.user_id });
+      if (!r.success) setError(r.error ?? "No se pudo eliminar");
+    });
+  };
 
   const requierUnidad =
     rol === "secretario" || rol === "subsecretario" || rol === "director" || rol === "coordinador";
@@ -135,14 +146,42 @@ function SinAsignarRow({
             <p className="text-xs text-muted py-1.5 mt-0.5">Acceso global</p>
           )}
         </div>
-        <div>
+        <div className="flex items-center gap-2">
           <button
             onClick={asignar}
             disabled={isPending}
-            className="w-full text-xs bg-primary text-white rounded px-3 py-1.5 hover:bg-primary/90 disabled:opacity-50"
+            className="flex-1 text-xs bg-primary text-white rounded px-3 py-1.5 hover:bg-primary/90 disabled:opacity-50"
           >
             {isPending ? "Asignando..." : "Asignar"}
           </button>
+          {confirmandoBorrado ? (
+            <>
+              <button
+                onClick={eliminar}
+                disabled={isPending}
+                className="text-xs text-danger font-semibold hover:text-danger/80 disabled:opacity-50 shrink-0"
+              >
+                Sí, eliminar
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmandoBorrado(false);
+                  setError(null);
+                }}
+                className="text-xs text-muted hover:text-foreground shrink-0"
+              >
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setConfirmandoBorrado(true)}
+              title="Eliminar definitivamente esta cuenta"
+              className="text-xs text-danger hover:text-danger/80 shrink-0 px-1"
+            >
+              Eliminar
+            </button>
+          )}
         </div>
       </div>
       {error && <p className="text-[10px] text-danger mt-1">{error}</p>}

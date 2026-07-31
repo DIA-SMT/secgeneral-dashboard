@@ -134,9 +134,12 @@ export default async function DashboardPage({ searchParams }: Props) {
   // sobre el total del ámbito.
   //
   // 30.07: el círculo completo es el 100 %. El anillo pinta SOLO esa porción
-  // ejecutada (repartida entre finalizados y en ejecución) y deja el resto —lo
-  // pendiente por finalizar— en gris. Los estados que no suman al avance no van
-  // al anillo: se leen en las cantidades de abajo.
+  // ejecutada y deja el resto —lo pendiente por finalizar— en gris.
+  //
+  // 31.07: dentro de esa porción también entran los NO INICIADOS (rojo), que
+  // antes quedaban afuera del anillo. El arco sigue midiendo lo mismo (el % del
+  // centro); lo que cambia es cómo se reparte por dentro: cada estado ocupa un
+  // tramo proporcional a su cantidad. Los "sin datos" siguen fuera del anillo.
   //
   // Con un filtro de estado aplicado, el anillo muestra SOLO ese color y el
   // número del centro pasa a ser el porcentaje de ese color sobre el total.
@@ -154,6 +157,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     : ([
         { estado: "verde", count: distribucionProyectos.verde },
         { estado: "amarillo", count: distribucionProyectos.amarillo },
+        { estado: "rojo", count: distribucionProyectos.rojo },
       ] as const);
 
   // Hay seguimiento si al menos un proyecto del ámbito tiene datos cargados.
