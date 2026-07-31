@@ -1,5 +1,7 @@
 import { getAgendaSemana, getUnidades } from "@/lib/queries";
 import { BackButton } from "@/components/layout/back-button";
+import { SuscribirCalendario } from "@/components/agenda/suscribir-calendario";
+import { tokenDeUnidad } from "@/lib/ics";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -45,6 +47,12 @@ export default async function AgendaTotemPage({
         <h1 className="text-2xl font-bold text-foreground">{unidadObj.nombre}</h1>
         <p className="text-sm text-muted mt-1">Agenda semanal — semana del {fecha_lunes}</p>
       </div>
+
+      <SuscribirCalendario
+        unidadId={unidadObj.id}
+        unidadNombre={unidadObj.nombre_corto ?? unidadObj.nombre}
+        token={tokenDeUnidad(unidadObj.id)}
+      />
 
       {!agenda ? (
         <div className="rounded-xl border border-border bg-surface p-8 text-center">

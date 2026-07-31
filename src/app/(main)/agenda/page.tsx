@@ -12,6 +12,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarioToolbar, type VistaCalendario } from "@/components/agenda/calendario-toolbar";
 import { CalendarioVista } from "@/components/agenda/calendario-vista";
+import { SuscribirCalendario } from "@/components/agenda/suscribir-calendario";
+import { tokenDeUnidad } from "@/lib/ics";
 import type { AgendaSemana, UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
@@ -167,6 +169,9 @@ export default async function AgendaPage({ searchParams }: Props) {
     indicePorUnidad[id] = Object.keys(indicePorUnidad).length;
   }
 
+  // Feed .ics: el del ámbito filtrado, o el del área propia si no es global.
+  const unidadSuscripcion = filtroUnidad ?? (!esGlobal ? perfil?.unidad_id ?? null : null);
+
   // Unidades que puede elegir en los filtros (acotadas a su ámbito)
   const unidadesFiltro = ambitoUsuario
     ? unidades.filter((u) => ambitoUsuario.has(u.id))
@@ -274,6 +279,19 @@ export default async function AgendaPage({ searchParams }: Props) {
             </span>
           ))}
         </div>
+      )}
+
+      {/* Suscripción al feed del ámbito elegido (o del área propia) */}
+      {unidadSuscripcion && (
+        <SuscribirCalendario
+          unidadId={unidadSuscripcion}
+          unidadNombre={
+            unidadById.get(unidadSuscripcion)?.nombre_corto ??
+            unidadById.get(unidadSuscripcion)?.nombre ??
+            "esta área"
+          }
+          token={tokenDeUnidad(unidadSuscripcion)}
+        />
       )}
 
       {/* Carga de agendas por dirección, para la semana en foco */}
