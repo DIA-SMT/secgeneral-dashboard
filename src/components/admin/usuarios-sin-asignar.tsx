@@ -10,6 +10,7 @@ const ROLES: { value: RolUsuario; label: string; nivel?: number }[] = [
   { value: "secretario", label: "Secretario", nivel: 0 },
   { value: "subsecretario", label: "Subsecretario", nivel: 1 },
   { value: "director", label: "Director", nivel: 2 },
+  { value: "coordinador", label: "Coordinador" },
   { value: "admin_funcional", label: "Admin funcional (Planif. Estratégica)" },
   { value: "admin_tecnico", label: "Admin técnico (Sistemas)" },
 ];
@@ -53,15 +54,17 @@ function SinAsignarRow({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const requierUnidad = rol === "secretario" || rol === "subsecretario" || rol === "director";
+  const requierUnidad =
+    rol === "secretario" || rol === "subsecretario" || rol === "director" || rol === "coordinador";
   const nivelEsperado = rol === "secretario" ? 0 : rol === "subsecretario" ? 1 : 2;
-  const unidadesParaRol = requierUnidad
-    ? unidades
-        .filter((u) => u.nivel === nivelEsperado)
+  // El coordinador (30.07) puede estar en cualquier nivel de la estructura.
+  const unidadesParaRol = !requierUnidad
+    ? []
+    : (rol === "coordinador" ? unidades : unidades.filter((u) => u.nivel === nivelEsperado))
+        .slice()
         .sort((a, b) =>
           (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre)
-        )
-    : [];
+        );
 
   const asignar = () => {
     setError(null);
@@ -101,7 +104,8 @@ function SinAsignarRow({
             onChange={(e) => {
               const v = e.target.value as RolUsuario;
               setRol(v);
-              if (!["secretario", "subsecretario", "director"].includes(v)) setUnidadId(null);
+              if (!["secretario", "subsecretario", "director", "coordinador"].includes(v))
+                setUnidadId(null);
             }}
             className="w-full text-xs bg-background border border-border rounded px-2 py-1.5 mt-0.5"
           >

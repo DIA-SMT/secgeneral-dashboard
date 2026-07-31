@@ -6,7 +6,7 @@ import { getSupabaseServer } from "./supabase/server";
 import { requireValidacionSobreUnidad, requireRol, getPerfilActual, getScopeUnidades } from "./auth";
 import { textoEsVacio, textoEsCero, avanceIndicador, avanceAgregado } from "./utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { RolUsuario } from "@/types/database";
+import type { AccionHistorial, RolUsuario } from "@/types/database";
 
 // -------------------------------------------------------
 // Server Actions: Agenda Semanal
@@ -107,6 +107,47 @@ async function recomputarEstadoMeta(sb: SupabaseClient, metaId: string): Promise
 async function metaIdDeIndicador(sb: SupabaseClient, indicadorId: string): Promise<string | null> {
   const { data } = await sb.from("indicador").select("meta_id").eq("id", indicadorId).single();
   return (data?.meta_id as string | undefined) ?? null;
+}
+
+// -------------------------------------------------------
+// Historial de Carga (30.07): trazabilidad de los indicadores
+// -------------------------------------------------------
+// Guarda una FOTO del indicador después de la operación. Se llama SIEMPRE
+// después del update (así refleja lo que quedó guardado) y nunca hace fallar
+// la carga: si el historial no se puede escribir, el avance igual se guardó.
+async function registrarHistorialIndicador(
+  sb: SupabaseClient,
+  indicadorId: string,
+  accion: AccionHistorial
+): Promise<void> {
+  try {
+    const { data: ind } = await sb
+      .from("indicador")
+      .select(
+        "valor_actual, valor_actual_texto, valor_objetivo, valor_objetivo_texto, unidad_medida, estado_semaforo, observacion"
+      )
+      .eq("id", indicadorId)
+      .single();
+    if (!ind) return;
+
+    const perfil = await getPerfilActual();
+    await sb.from("indicador_historial").insert({
+      indicador_id: indicadorId,
+      accion,
+      valor_actual: ind.valor_actual,
+      valor_actual_texto: ind.valor_actual_texto,
+      valor_objetivo: ind.valor_objetivo,
+      valor_objetivo_texto: ind.valor_objetivo_texto,
+      unidad_medida: ind.unidad_medida,
+      estado_semaforo: ind.estado_semaforo,
+      observacion: ind.observacion,
+      registrado_por: perfil?.user_id ?? null,
+      registrado_por_email: perfil?.email ?? null,
+      registrado_por_nombre: perfil?.nombre ?? null,
+    });
+  } catch {
+    // El historial es accesorio: nunca debe romper la carga del avance.
+  }
 }
 
 // -------------------------------------------------------
@@ -558,6 +599,9 @@ export async function actualizarIndicador(input: {
 
   if (error) return { success: false, error: error.message };
 
+  // Trazabilidad: queda registrada la carga con su valor y su fecha (30.07).
+  await registrarHistorialIndicador(sb, indicador_id, "carga");
+
   // Propagar el cambio a la meta (estado por cascada).
   if (ind?.meta_id) await recomputarEstadoMeta(sb, ind.meta_id as string);
 
@@ -581,7 +625,7 @@ export async function borrarValorIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "coordinador", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -598,6 +642,7 @@ export async function borrarValorIndicador(input: {
     })
     .eq("id", input.indicador_id);
   if (error) return { success: false, error: error.message };
+  await registrarHistorialIndicador(sb, input.indicador_id, "borrado");
   if (metaId) await recomputarEstadoMeta(sb, metaId);
   if (input.proyecto_id) revalidatePath(`/proyectos/${input.proyecto_id}`);
   revalidatePath("/proyectos");
@@ -622,7 +667,7 @@ export async function editarIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "coordinador", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -648,6 +693,7 @@ export async function editarIndicador(input: {
     .update(update)
     .eq("id", input.indicador_id);
   if (error) return { success: false, error: error.message };
+  await registrarHistorialIndicador(sb, input.indicador_id, "edicion");
   // Cambiar el objetivo puede cambiar el % (y por ende el estado) de la meta.
   const metaId = await metaIdDeIndicador(sb, input.indicador_id);
   if (metaId) await recomputarEstadoMeta(sb, metaId);
@@ -667,7 +713,7 @@ export async function eliminarIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "coordinador", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -700,7 +746,7 @@ export async function crearIndicador(input: {
   proyecto_id?: string;
 }) {
   try {
-    await requireRol("director", "subsecretario", "secretario", "admin_funcional");
+    await requireRol("director", "subsecretario", "secretario", "coordinador", "admin_funcional");
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }
@@ -836,7 +882,7 @@ interface FichaPrismaInput {
 export async function crearFichaPrisma(input: FichaPrismaInput) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "coordinador", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Solo los Directores pueden cargar fichas PRISMA" };
   }
   if (!perfil.unidad_id && perfil.rol === "director") {
@@ -925,7 +971,7 @@ export async function crearProyecto(input: {
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "coordinador", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Solo Directores o Admin Funcional pueden crear proyectos" };
   }
   if (!input.nombre?.trim()) return { success: false, error: "El nombre del proyecto es obligatorio" };
@@ -957,7 +1003,7 @@ export async function crearProyecto(input: {
   return { success: true, id: (data as { id: string }).id };
 }
 
-const ROLES_EDICION_PROYECTO = ["director", "subsecretario", "secretario", "admin_funcional"];
+const ROLES_EDICION_PROYECTO = ["director", "subsecretario", "secretario", "coordinador", "admin_funcional"];
 
 // Verifica que el usuario tenga permiso sobre el proyecto (rol + ámbito).
 // admin_funcional/admin_tecnico tienen alcance global; el resto queda acotado
@@ -1066,7 +1112,7 @@ export async function crearMeta(input: {
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "coordinador", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Sin permisos para crear metas" };
   }
   if (!input.nombre?.trim()) return { success: false, error: "El enunciado de la meta es obligatorio" };
@@ -1102,7 +1148,7 @@ export async function editarMeta(input: {
 }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "coordinador", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Sin permisos para editar metas" };
   }
   if (input.nombre !== undefined && !input.nombre.trim()) {
@@ -1129,7 +1175,7 @@ export async function editarMeta(input: {
 export async function eliminarMeta(input: { meta_id: string; proyecto_id: string }) {
   const perfil = await getPerfilActual();
   if (!perfil) return { success: false, error: "No autenticado" };
-  if (!["director", "subsecretario", "secretario", "admin_funcional"].includes(perfil.rol)) {
+  if (!["director", "subsecretario", "secretario", "coordinador", "admin_funcional"].includes(perfil.rol)) {
     return { success: false, error: "Sin permisos para eliminar metas" };
   }
   const sb = await getSupabaseServer();

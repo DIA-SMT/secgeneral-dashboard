@@ -29,6 +29,7 @@ const rolLabels: Record<RolUsuario, string> = {
   secretario: "Secretario",
   subsecretario: "Subsecretario",
   director: "Director",
+  coordinador: "Coordinador",
   admin_funcional: "Planificación Estratégica",
   admin_tecnico: "Sistemas",
 };

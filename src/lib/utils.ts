@@ -4,8 +4,8 @@ import type { EstadoSemaforo } from "@/types/database";
 // Helpers de presentacion
 // -------------------------------------------------------
 
-// El estado "rojo" (No iniciado) se pinta en azul/celeste desde el 28.07: el
-// rojo quedó reservado para errores y acciones destructivas.
+// El estado "rojo" (No iniciado) usa el token `info`, que desde el 30.07 vuelve
+// a valer rojo (ver globals.css). El 28.07 se había probado en celeste.
 export function semaforoColor(estado: EstadoSemaforo): string {
   const map: Record<EstadoSemaforo, string> = {
     verde: "bg-success",
@@ -361,8 +361,8 @@ export function avanceGlobalPorEstado(dist: {
 // Avance global (correcciones 28.07): se mide porcentualmente sumando los
 // proyectos FINALIZADOS + los EN EJECUCIÓN sobre el total de proyectos del
 // ámbito. No pondera por avance individual ni por peso de metas: es conteo.
-// Los "no iniciados" y los "sin datos" quedan fuera del numerador y su
-// porcentaje se ve en el anillo (celeste / gris).
+// Los "no iniciados" y los "sin datos" quedan fuera del numerador: el 30.07 el
+// anillo pasa a pintar solo la porción ejecutada y el resto queda en gris.
 // ---------------------------------------------------------------------------
 
 export type DistribucionEstados = {

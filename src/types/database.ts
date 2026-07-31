@@ -12,8 +12,12 @@ export type RolUsuario =
   | "secretario"
   | "subsecretario"
   | "director"
+  // Coordinador (30.07): mismo alcance de carga que un secretario sobre su
+  // unidad + descendientes. Se creó para la Secretaría de Ambiente.
+  | "coordinador"
   | "admin_funcional"
   | "admin_tecnico";
+export type AccionHistorial = "carga" | "edicion" | "borrado";
 export type EstadoValidacion = "pendiente" | "validado" | "observado";
 export type FrecuenciaMedicion = "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | "puntual";
 
@@ -185,6 +189,25 @@ export interface Indicador {
   updated_at: string;
   // Joined
   meta?: Meta;
+}
+
+// Historial de Carga de un indicador (30.07): una fila por operación, con el
+// valor tal como quedó y quién/cuándo lo cargó.
+export interface IndicadorHistorial {
+  id: string;
+  indicador_id: string;
+  accion: AccionHistorial;
+  valor_actual: number | null;
+  valor_actual_texto: string | null;
+  valor_objetivo: number | null;
+  valor_objetivo_texto: string | null;
+  unidad_medida: string | null;
+  estado_semaforo: EstadoSemaforo | null;
+  observacion: string | null;
+  registrado_por: string | null;
+  registrado_por_email: string | null;
+  registrado_por_nombre: string | null;
+  created_at: string;
 }
 
 export interface AgendaSemana {

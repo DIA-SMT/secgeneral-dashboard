@@ -3,6 +3,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { BackButton } from "@/components/layout/back-button";
 import { IndicadorCargaForm } from "@/components/indicadores/indicador-carga-form";
 import { IndicadorAccionesBar } from "@/components/indicadores/indicador-acciones-bar";
+import { HistorialCarga } from "@/components/indicadores/historial-carga";
+import { getHistorialIndicador } from "@/lib/queries";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import { estadoIndicadorEnPlazo, indicadorCumplido } from "@/lib/utils";
 import { PlazoBadge } from "@/components/ui/plazo-badge";
@@ -33,13 +35,18 @@ export default async function IndicadorDetallePage({
   const proyecto = ind.meta?.proyecto;
   const hoy = new Date().toISOString().slice(0, 10);
 
+  const historial = await getHistorialIndicador(ind.id);
+
   const perfil = await getPerfilActual();
   let puedeCargar = false;
   if (perfil) {
     if (perfil.rol === "admin_funcional") {
       puedeCargar = true;
     } else if (
-      (perfil.rol === "director" || perfil.rol === "secretario" || perfil.rol === "subsecretario") &&
+      (perfil.rol === "director" ||
+        perfil.rol === "secretario" ||
+        perfil.rol === "subsecretario" ||
+        perfil.rol === "coordinador") &&
       proyecto?.unidad_id
     ) {
       const scope = await getScopeUnidades(perfil);
@@ -162,6 +169,9 @@ export default async function IndicadorDetallePage({
           )}
         </div>
       </div>
+
+      {/* Historial de Carga (30.07): trazabilidad de valores y fechas */}
+      <HistorialCarga historial={historial} unidadMedida={ind.unidad_medida} />
 
       {ind.meta && (
         <div className="rounded-xl border border-border bg-surface p-5">

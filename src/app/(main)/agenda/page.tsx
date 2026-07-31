@@ -1,23 +1,103 @@
-import { getUnidades, getAgendasSemana, lunesDeSemana } from "@/lib/queries";
+import {
+  getUnidades,
+  getAgendasSemana,
+  getEventosAgenda,
+  lunesIso,
+  sumarDias,
+  type EventoAgenda,
+} from "@/lib/queries";
 import { getPerfilActual } from "@/lib/auth";
-import { esRolGlobal } from "@/lib/utils";
+import { coincideBusqueda, esRolGlobal, normalizarBusqueda } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CalendarioMes } from "@/components/agenda/calendario-mes";
+import { CalendarioToolbar, type VistaCalendario } from "@/components/agenda/calendario-toolbar";
+import { CalendarioVista } from "@/components/agenda/calendario-vista";
 import type { AgendaSemana, UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
 
 interface Props {
-  searchParams: Promise<{ semana?: string; sec?: string }>;
+  searchParams: Promise<{
+    vista?: string;
+    fecha?: string;
+    sec?: string;
+    sub?: string;
+    dir?: string;
+    q?: string;
+    // Compatibilidad con los links viejos (?semana=YYYY-MM-DD)
+    semana?: string;
+  }>;
 }
+
+const MESES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+const esIso = (s: string | undefined): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 export default async function AgendaPage({ searchParams }: Props) {
   const params = await searchParams;
-  const fechaLunes = params.semana ?? lunesDeSemana();
-  const [unidades, agendas, perfil] = await Promise.all([
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  const vista: VistaCalendario =
+    params.vista === "semana" || params.vista === "dia" ? params.vista : "mes";
+  const fecha = esIso(params.fecha) ? params.fecha : esIso(params.semana) ? params.semana : hoy;
+
+  // -------------------------------------------------------
+  // Rango de días que se muestra según la vista
+  // -------------------------------------------------------
+  let desde: string;
+  let hasta: string;
+  let titulo: string;
+  let anterior: string;
+  let siguiente: string;
+  const mesReferencia = Number(fecha.slice(5, 7)) - 1;
+
+  if (vista === "dia") {
+    desde = fecha;
+    hasta = fecha;
+    anterior = sumarDias(fecha, -1);
+    siguiente = sumarDias(fecha, 1);
+    titulo = new Date(fecha + "T00:00:00").toLocaleDateString("es-AR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  } else if (vista === "semana") {
+    desde = lunesIso(fecha);
+    hasta = sumarDias(desde, 6);
+    anterior = sumarDias(desde, -7);
+    siguiente = sumarDias(desde, 7);
+    titulo = `${Number(desde.slice(8, 10))} – ${Number(hasta.slice(8, 10))} de ${
+      MESES[Number(hasta.slice(5, 7)) - 1]
+    } ${hasta.slice(0, 4)}`;
+  } else {
+    const primero = `${fecha.slice(0, 7)}-01`;
+    const diasDelMes = new Date(
+      Number(fecha.slice(0, 4)),
+      Number(fecha.slice(5, 7)),
+      0
+    ).getDate();
+    const ultimo = `${fecha.slice(0, 7)}-${String(diasDelMes).padStart(2, "0")}`;
+    desde = lunesIso(primero); // la grilla arranca el lunes de la 1ª semana
+    hasta = sumarDias(lunesIso(ultimo), 6); // y termina el domingo de la última
+    anterior = sumarDias(primero, -1);
+    siguiente = sumarDias(ultimo, 1);
+    titulo = `${MESES[mesReferencia]} ${fecha.slice(0, 4)}`;
+  }
+
+  const dias: string[] = [];
+  for (let d = desde; d <= hasta; d = sumarDias(d, 1)) dias.push(d);
+
+  // -------------------------------------------------------
+  // Datos
+  // -------------------------------------------------------
+  const semanaFoco = lunesIso(fecha); // semana de la lista de fichas de abajo
+  const [unidades, eventosRango, agendas, perfil] = await Promise.all([
     getUnidades(),
-    getAgendasSemana(fechaLunes),
+    getEventosAgenda(desde, hasta),
+    getAgendasSemana(semanaFoco),
     getPerfilActual(),
   ]);
   const esGlobal = esRolGlobal(perfil?.rol);
@@ -32,15 +112,6 @@ export default async function AgendaPage({ searchParams }: Props) {
     (childrenByParent.get(key) ?? childrenByParent.set(key, []).get(key)!).push(u);
   }
 
-  const agendasPorUnidad = new Map<string, AgendaSemana>();
-  for (const a of agendas) agendasPorUnidad.set(a.unidad_id, a);
-
-  const secretarias = unidades.filter((u) => u.nivel === 0).sort(sortByName);
-  const secFiltro = params.sec || null;
-  const secretariasMostrar = secFiltro
-    ? secretarias.filter((s) => s.id === secFiltro)
-    : secretarias;
-
   // Todas las direcciones (nivel >= 2) descendientes de una unidad
   const direccionesDe = (unidadId: string): UnidadOrganizacional[] => {
     const out: UnidadOrganizacional[] = [];
@@ -54,24 +125,64 @@ export default async function AgendaPage({ searchParams }: Props) {
     return out.sort(sortByName);
   };
 
-  // Calcular semana siguiente/anterior
-  const lunesDate = new Date(fechaLunes + "T00:00:00");
-  const prev = new Date(lunesDate); prev.setDate(prev.getDate() - 7);
-  const next = new Date(lunesDate); next.setDate(next.getDate() + 7);
-  const prevIso = prev.toISOString().slice(0, 10);
-  const nextIso = next.toISOString().slice(0, 10);
+  // Subárbol completo (incluye la propia unidad)
+  const subarbol = (unidadId: string): Set<string> => {
+    const out = new Set<string>([unidadId]);
+    const walk = (id: string) => {
+      for (const child of childrenByParent.get(id) ?? []) {
+        out.add(child.id);
+        walk(child.id);
+      }
+    };
+    walk(unidadId);
+    return out;
+  };
 
-  const fechaLegible = lunesDate.toLocaleDateString("es-AR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  // -------------------------------------------------------
+  // Filtros: ámbito del usuario + secretaría/subsecretaría/dirección + texto
+  // -------------------------------------------------------
+  // Quien no tiene acceso global solo ve su árbol; el filtro no puede sacarlo de ahí.
+  const ambitoUsuario = !esGlobal && perfil?.unidad_id ? subarbol(perfil.unidad_id) : null;
+
+  const filtroUnidad = params.dir || params.sub || params.sec || null;
+  const ambitoFiltro = filtroUnidad ? subarbol(filtroUnidad) : null;
+
+  const unidadVisible = (unidadId: string) =>
+    (!ambitoUsuario || ambitoUsuario.has(unidadId)) &&
+    (!ambitoFiltro || ambitoFiltro.has(unidadId));
+
+  const termino = normalizarBusqueda(params.q ?? "");
+  const coincide = (e: EventoAgenda) =>
+    !termino ||
+    coincideBusqueda(e.actividad, termino) ||
+    coincideBusqueda(e.lugar, termino) ||
+    coincideBusqueda(e.observacion, termino) ||
+    coincideBusqueda(e.unidad_nombre, termino);
+
+  const eventos = eventosRango.filter((e) => unidadVisible(e.unidad_id) && coincide(e));
+
+  // Color estable por unidad dentro de la vista actual.
+  const indicePorUnidad: Record<string, number> = {};
+  for (const id of [...new Set(eventos.map((e) => e.unidad_id))].sort()) {
+    indicePorUnidad[id] = Object.keys(indicePorUnidad).length;
+  }
+
+  // Unidades que puede elegir en los filtros (acotadas a su ámbito)
+  const unidadesFiltro = ambitoUsuario
+    ? unidades.filter((u) => ambitoUsuario.has(u.id))
+    : unidades;
+
+  // -------------------------------------------------------
+  // Fichas de la semana (carga de agendas), respetando los mismos filtros
+  // -------------------------------------------------------
+  const agendasPorUnidad = new Map<string, AgendaSemana>();
+  for (const a of agendas) agendasPorUnidad.set(a.unidad_id, a);
 
   const FichaCard = ({ unidad }: { unidad: UnidadOrganizacional }) => {
     const agenda = agendasPorUnidad.get(unidad.id);
     return (
       <Link
-        href={`/agenda/${unidad.id}/${fechaLunes}`}
+        href={`/agenda/${unidad.id}/${semanaFoco}`}
         className={`block rounded-xl border p-4 hover:border-primary/40 transition-colors ${
           agenda ? "border-success/30 bg-success/5" : "border-border bg-surface"
         }`}
@@ -90,135 +201,99 @@ export default async function AgendaPage({ searchParams }: Props) {
     );
   };
 
-  // Vista acotada: usuarios con área asignada ven solo su ámbito.
-  // - Director → la agenda de su dirección.
-  // - Secretario / Subsecretario → las agendas de TODAS sus direcciones.
-  if (!esGlobal && perfil?.unidad_id) {
-    const miUnidad = unidadById.get(perfil.unidad_id);
-    const unidadesScoped =
-      perfil.rol === "director"
-        ? miUnidad
-          ? [miUnidad]
-          : []
-        : direccionesDe(perfil.unidad_id);
-    return (
-      <div className="space-y-6 max-w-6xl">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Agenda Semanal</h1>
-            <p className="text-sm text-muted mt-1">
-              {miUnidad?.nombre ?? "Mi área"} · semana del {fechaLegible}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/agenda?semana=${prevIso}`} className="text-xs text-muted hover:text-foreground border border-border rounded-lg px-3 py-1.5">←</Link>
-            <Suspense><CalendarioMes semanaActual={fechaLunes} /></Suspense>
-            <Link href={`/agenda?semana=${nextIso}`} className="text-xs text-muted hover:text-foreground border border-border rounded-lg px-3 py-1.5">→</Link>
-            <Link href={`/agenda/cargar?semana=${fechaLunes}`} className="text-xs text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 rounded-lg px-3 py-1.5">+ Cargar agenda</Link>
-          </div>
+  // Direcciones a listar abajo: todas las del ámbito visible.
+  const raizFichas = filtroUnidad ?? (ambitoUsuario ? perfil!.unidad_id! : null);
+  let direccionesFichas: UnidadOrganizacional[];
+  if (raizFichas) {
+    const raiz = unidadById.get(raizFichas);
+    direccionesFichas =
+      raiz && raiz.nivel >= 2 ? [raiz, ...direccionesDe(raizFichas)] : direccionesDe(raizFichas);
+  } else {
+    direccionesFichas = unidades.filter((u) => u.nivel >= 2).sort(sortByName);
+  }
+
+  const semanaLegible = `${Number(semanaFoco.slice(8, 10))} de ${
+    MESES[Number(semanaFoco.slice(5, 7)) - 1]
+  }`;
+
+  return (
+    <div className="space-y-6 max-w-7xl">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Agenda</h1>
+          <p className="text-sm text-muted mt-1">
+            Calendario de actividades de todas las direcciones
+          </p>
         </div>
-        {unidadesScoped.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {unidadesScoped.map((u) => (
+        <Link
+          href={`/agenda/cargar?semana=${semanaFoco}`}
+          className="text-xs text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 rounded-lg px-3 py-1.5 self-start"
+        >
+          + Cargar agenda
+        </Link>
+      </div>
+
+      <Suspense>
+        <CalendarioToolbar
+          vista={vista}
+          fecha={fecha}
+          titulo={titulo}
+          unidades={unidadesFiltro}
+          sec={params.sec ?? null}
+          sub={params.sub ?? null}
+          dir={params.dir ?? null}
+          q={params.q ?? ""}
+          anterior={anterior}
+          siguiente={siguiente}
+          hoy={hoy}
+        />
+      </Suspense>
+
+      <CalendarioVista
+        vista={vista}
+        dias={dias}
+        eventos={eventos}
+        mesReferencia={mesReferencia}
+        hoy={hoy}
+        indicePorUnidad={indicePorUnidad}
+      />
+
+      {/* Leyenda: qué unidad es cada color */}
+      {Object.keys(indicePorUnidad).length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {Object.entries(indicePorUnidad).map(([unidadId, i]) => (
+            <span key={unidadId} className="inline-flex items-center gap-1.5 text-[11px] text-muted">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  ["bg-primary", "bg-success", "bg-accent", "bg-warning", "bg-info"][i % 5]
+                }`}
+              />
+              {unidadById.get(unidadId)?.nombre_corto ??
+                unidadById.get(unidadId)?.nombre ??
+                "—"}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Carga de agendas por dirección, para la semana en foco */}
+      <section>
+        <div className="flex items-center justify-between gap-3 mb-3 border-b border-border pb-2">
+          <h2 className="text-sm font-semibold text-foreground">
+            Agendas de la semana del {semanaLegible}
+          </h2>
+          <span className="text-xs text-muted">{direccionesFichas.length} direcciones</span>
+        </div>
+        {direccionesFichas.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {direccionesFichas.map((u) => (
               <FichaCard key={u.id} unidad={u} />
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted">No hay direcciones asociadas a tu área.</p>
+          <p className="text-sm text-muted">No hay direcciones para este filtro.</p>
         )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 max-w-6xl">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Agenda Semanal</h1>
-          <p className="text-sm text-muted mt-1">Semana del {fechaLegible}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href={`/agenda?semana=${prevIso}${secFiltro ? `&sec=${secFiltro}` : ""}`} className="text-xs text-muted hover:text-foreground border border-border rounded-lg px-3 py-1.5">←</Link>
-          <Suspense><CalendarioMes semanaActual={fechaLunes} /></Suspense>
-          <Link href={`/agenda?semana=${nextIso}${secFiltro ? `&sec=${secFiltro}` : ""}`} className="text-xs text-muted hover:text-foreground border border-border rounded-lg px-3 py-1.5">→</Link>
-          <Link href={`/agenda/cargar?semana=${fechaLunes}`} className="text-xs text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 rounded-lg px-3 py-1.5">+ Cargar agenda</Link>
-        </div>
-      </div>
-
-      {/* Filtro por Secretaría */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted uppercase tracking-wider">Secretaría:</span>
-        <Link
-          href={`/agenda?semana=${fechaLunes}`}
-          className={`text-xs px-3 py-1 rounded-lg border ${
-            !secFiltro ? "bg-primary/20 text-primary border-primary/30" : "border-border text-muted hover:text-foreground"
-          }`}
-        >
-          Todas
-        </Link>
-        {secretarias.map((s) => (
-          <Link
-            key={s.id}
-            href={`/agenda?semana=${fechaLunes}&sec=${s.id}`}
-            className={`text-xs px-3 py-1 rounded-lg border ${
-              secFiltro === s.id ? "bg-primary/20 text-primary border-primary/30" : "border-border text-muted hover:text-foreground"
-            }`}
-          >
-            {s.nombre_corto ?? s.nombre}
-          </Link>
-        ))}
-      </div>
-
-      <div className="space-y-8">
-        {secretariasMostrar.map((sec) => {
-          const subs = (childrenByParent.get(sec.id) ?? []).filter((u) => u.nivel === 1).sort(sortByName);
-          const dirsDirectas = (childrenByParent.get(sec.id) ?? []).filter((u) => u.nivel === 2).sort(sortByName);
-          const totalDirs = direccionesDe(sec.id).length;
-          if (totalDirs === 0) return null;
-
-          return (
-            <section key={sec.id}>
-              <div className="flex items-center gap-2 mb-4 border-b border-border pb-2">
-                <div className="h-7 w-7 rounded-md bg-primary/20 flex items-center justify-center">
-                  <span className="text-primary text-xs font-bold">{sec.nombre_corto?.[0] ?? sec.nombre[0]}</span>
-                </div>
-                <h2 className="text-base font-bold text-foreground">{sec.nombre}</h2>
-                <span className="text-xs text-muted">· {totalDirs} direcciones</span>
-              </div>
-
-              {/* Direcciones que cuelgan directo de la secretaría */}
-              {dirsDirectas.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
-                  {dirsDirectas.map((dir) => (
-                    <FichaCard key={dir.id} unidad={dir} />
-                  ))}
-                </div>
-              )}
-
-              {/* Subsecretarías con sus direcciones */}
-              {subs.map((sub) => {
-                const dirs = direccionesDe(sub.id);
-                if (dirs.length === 0) return null;
-                return (
-                  <div key={sub.id} className="mb-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="h-5 w-5 rounded bg-accent/20 flex items-center justify-center">
-                        <span className="text-accent text-[10px] font-bold">{sub.nombre_corto?.[0]}</span>
-                      </div>
-                      <h3 className="text-xs font-semibold text-accent uppercase tracking-wider">{sub.nombre}</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {dirs.map((dir) => (
-                        <FichaCard key={dir.id} unidad={dir} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </section>
-          );
-        })}
-      </div>
+      </section>
     </div>
   );
 }

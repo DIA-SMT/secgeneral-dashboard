@@ -21,7 +21,7 @@ export function MiniGauge({ value, estado, size = 56, label }: Props) {
       : estado === "amarillo"
       ? "var(--color-warning, #ca8a04)"
       : estado === "rojo"
-      ? "var(--color-info, #38BDF8)" // No iniciado → celeste (28.07)
+      ? "var(--color-info, #EF4444)" // No iniciado → rojo (30.07)
       : "var(--color-border, #888)";
 
   return (

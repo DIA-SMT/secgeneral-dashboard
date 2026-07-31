@@ -14,9 +14,11 @@
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
-  /* Semáforo "No iniciado": desde el 28.07 va en azul/celeste, no en rojo.
-     `danger` queda reservado para errores y acciones destructivas. */
-  --color-info: #38BDF8;
+  /* Semáforo "No iniciado". El 28.07 se había pasado a celeste; el 30.07
+     pidieron volver al rojo. Se mantiene el token `info` como el color del
+     estado "No iniciado" (lo usan todos los componentes del semáforo) y se
+     cambia acá su valor: es el único punto a tocar si vuelven a cambiarlo. */
+  --color-info: #EF4444;
   --font-sans: 'Poppins', sans-serif;
 }
 

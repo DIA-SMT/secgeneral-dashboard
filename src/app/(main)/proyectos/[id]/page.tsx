@@ -49,8 +49,12 @@ export default async function ProyectoDetallePage({
       puedeCargar = true;
     } else if (perfil.rol === "director") {
       puedeCargar = perfil.unidad_id === proyecto.unidad_id;
-    } else if (perfil.rol === "secretario" || perfil.rol === "subsecretario") {
-      // Secretario/Subsec: cualquier proyecto dentro de su ámbito (descendientes)
+    } else if (
+      perfil.rol === "secretario" ||
+      perfil.rol === "subsecretario" ||
+      perfil.rol === "coordinador"
+    ) {
+      // Secretario/Subsec/Coordinador: cualquier proyecto dentro de su ámbito
       const scope = await getScopeUnidades(perfil);
       puedeCargar = scope.includes(proyecto.unidad_id);
     }

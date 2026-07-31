@@ -128,11 +128,15 @@ export default async function DashboardPage({ searchParams }: Props) {
   }
 
   // -------------------------------------------------------
-  // Avance global (correcciones 28.07)
+  // Avance global (correcciones 28.07 + 30.07)
   // -------------------------------------------------------
   // Se mide porcentualmente por CONTEO de proyectos: finalizados + en ejecución
-  // sobre el total del ámbito. El anillo muestra la proporción de cada estado
-  // (y al pasar el mouse, su porcentaje).
+  // sobre el total del ámbito.
+  //
+  // 30.07: el círculo completo es el 100 %. El anillo pinta SOLO esa porción
+  // ejecutada (repartida entre finalizados y en ejecución) y deja el resto —lo
+  // pendiente por finalizar— en gris. Los estados que no suman al avance no van
+  // al anillo: se leen en las cantidades de abajo.
   //
   // Con un filtro de estado aplicado, el anillo muestra SOLO ese color y el
   // número del centro pasa a ser el porcentaje de ese color sobre el total.
@@ -150,8 +154,6 @@ export default async function DashboardPage({ searchParams }: Props) {
     : ([
         { estado: "verde", count: distribucionProyectos.verde },
         { estado: "amarillo", count: distribucionProyectos.amarillo },
-        { estado: "rojo", count: distribucionProyectos.rojo },
-        { estado: "sin_datos", count: distribucionProyectos.sin_datos },
       ] as const);
 
   // Hay seguimiento si al menos un proyecto del ámbito tiene datos cargados.
@@ -250,6 +252,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             centerValue={tieneSeguimiento ? porcentajeGlobal : null}
             segments={[...segmentosGauge]}
             totalReferencia={totalAmbito}
+            labelPendiente={estadoFiltro ? "Resto del ámbito" : "Pendiente por finalizar"}
             size={110}
             strokeWidth={10}
           />

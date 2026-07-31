@@ -32,7 +32,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
 
   // Perfil + scope para saber si el usuario puede cargar avances
   const perfil = await getPerfilActual();
-  const rolesCarga = ["director", "subsecretario", "secretario", "admin_funcional"];
+  const rolesCarga = ["director", "subsecretario", "secretario", "coordinador", "admin_funcional"];
   const puedeCargarBase = !!perfil && rolesCarga.includes(perfil.rol);
   const scopeUnidadesUsuario =
     puedeCargarBase && perfil ? new Set(await getScopeUnidades(perfil)) : null;

@@ -13,6 +13,7 @@ export interface ChatContext {
     | "secretario"
     | "subsecretario"
     | "director"
+    | "coordinador"
     | "admin_funcional"
     | "admin_tecnico";
   perfil_nombre?: string;

@@ -9,6 +9,7 @@ const ROLES: { value: RolUsuario; label: string }[] = [
   { value: "secretario", label: "Secretario" },
   { value: "subsecretario", label: "Subsecretario" },
   { value: "director", label: "Director" },
+  { value: "coordinador", label: "Coordinador" },
   { value: "admin_funcional", label: "Admin funcional (Planif. Estratégica)" },
   { value: "admin_tecnico", label: "Admin técnico (Sistemas)" },
 ];
@@ -85,9 +86,18 @@ function UsuarioRow({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const requierUnidad = rol === "secretario" || rol === "subsecretario" || rol === "director";
+  const requierUnidad =
+    rol === "secretario" || rol === "subsecretario" || rol === "director" || rol === "coordinador";
   const nivelEsperado = rol === "secretario" ? 0 : rol === "subsecretario" ? 1 : 2;
-  const unidadesParaRol = requierUnidad ? unidadesByNivel(nivelEsperado) : [];
+  // El coordinador (30.07) no está atado a un nivel: puede coordinar una
+  // secretaría, una subsecretaría o una dirección.
+  const unidadesParaRol = !requierUnidad
+    ? []
+    : rol === "coordinador"
+    ? [...unidades].sort((a, b) =>
+        (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre)
+      )
+    : unidadesByNivel(nivelEsperado);
 
   const guardar = () => {
     setError(null);
@@ -128,7 +138,8 @@ function UsuarioRow({
             onChange={(e) => {
               const nuevo = e.target.value as RolUsuario;
               setRol(nuevo);
-              if (!["secretario", "subsecretario", "director"].includes(nuevo)) setUnidadId(null);
+              if (!["secretario", "subsecretario", "director", "coordinador"].includes(nuevo))
+                setUnidadId(null);
             }}
             className="text-xs bg-background border border-border rounded px-2 py-1"
           >
