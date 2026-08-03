@@ -85,6 +85,7 @@ function UsuarioRow({
 }) {
   const [rol, setRol] = useState<RolUsuario>(perfil.rol);
   const [unidadId, setUnidadId] = useState<string | null>(perfil.unidad_id);
+  const [accesoGlobal, setAccesoGlobal] = useState(perfil.acceso_global ?? false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
@@ -113,6 +114,7 @@ function UsuarioRow({
         user_id: perfil.user_id,
         rol,
         unidad_id: requierUnidad ? unidadId : null,
+        acceso_global: accesoGlobal,
       });
       if (!r.success) setError(r.error ?? "Error al guardar");
       else onCancel();
@@ -178,7 +180,32 @@ function UsuarioRow({
             ))}
           </select>
         ) : (
-          unidadActual ? (unidadActual.nombre_corto ?? unidadActual.nombre) : <span className="text-muted">global</span>
+          <>
+            {unidadActual ? (
+              unidadActual.nombre_corto ?? unidadActual.nombre
+            ) : (
+              <span className="text-muted">global</span>
+            )}
+            {perfil.acceso_global && (
+              <span
+                className="ml-2 text-[9px] uppercase tracking-wider bg-accent/15 text-accent border border-accent/25 rounded px-1.5 py-0.5"
+                title="Ve todas las áreas (solo lectura). Carga únicamente en la suya."
+              >
+                ve todo
+              </span>
+            )}
+          </>
+        )}
+        {editing && (
+          <label className="flex items-center gap-1.5 mt-2 text-[10px] text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={accesoGlobal}
+              onChange={(e) => setAccesoGlobal(e.target.checked)}
+              className="accent-accent"
+            />
+            Ve todas las áreas (solo lectura)
+          </label>
         )}
       </td>
       <td className="p-3">

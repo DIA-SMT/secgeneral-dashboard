@@ -3,7 +3,7 @@ import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import {
   calcularAvancePorIndicadores,
   coincideBusqueda,
-  esRolGlobal,
+  perfilVeTodo,
   normalizarBusqueda,
   subtreeUnidades,
 } from "@/lib/utils";
@@ -184,7 +184,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
         <Suspense>
           <ProyectosSearch
             unidades={
-              esRolGlobal(perfil?.rol) ? unidades : subtreeUnidades(unidades, perfil?.unidad_id ?? null)
+              perfilVeTodo(perfil) ? unidades : subtreeUnidades(unidades, perfil?.unidad_id ?? null)
             }
           />
         </Suspense>
@@ -217,7 +217,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
       <PoaTree
         arbol={arbol}
         autoExpand={
-          !esRolGlobal(perfil?.rol) ||
+          !perfilVeTodo(perfil) ||
           !!(params.dir || params.q || (params.estado && params.estado !== "todos"))
         }
       />

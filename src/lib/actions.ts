@@ -407,6 +407,8 @@ export async function actualizarPerfil(input: {
   user_id: string;
   rol: RolUsuario;
   unidad_id: string | null;
+  /** Ve todas las unidades (solo lectura). No amplía permisos de carga. */
+  acceso_global?: boolean;
 }) {
   try {
     await requireRol("admin_funcional", "admin_tecnico");
@@ -414,9 +416,14 @@ export async function actualizarPerfil(input: {
     return { success: false, error: (e as Error).message };
   }
   const sb = await getSupabaseServer();
+  const update: { rol: RolUsuario; unidad_id: string | null; acceso_global?: boolean } = {
+    rol: input.rol,
+    unidad_id: input.unidad_id,
+  };
+  if (input.acceso_global !== undefined) update.acceso_global = input.acceso_global;
   const { error } = await sb
     .from("perfil_usuario")
-    .update({ rol: input.rol, unidad_id: input.unidad_id })
+    .update(update)
     .eq("user_id", input.user_id);
   if (error) return { success: false, error: error.message };
   revalidatePath("/admin/usuarios");

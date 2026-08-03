@@ -158,6 +158,11 @@ export interface PerfilUsuario {
   rol: RolUsuario;
   unidad_id: string | null;
   activo: boolean;
+  /**
+   * Ve TODAS las unidades sin importar rol/unidad (solo lectura). No amplía
+   * permisos de carga: eso sigue saliendo del rol + su unidad. (03.08)
+   */
+  acceso_global: boolean;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;

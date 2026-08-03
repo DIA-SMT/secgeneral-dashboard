@@ -13,6 +13,7 @@ import {
   avanceGlobalPorConteo,
   porcentajeDeEstado,
   totalDistribucion,
+  perfilVeTodo,
   type AvanceNivel,
 } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
@@ -34,13 +35,10 @@ export default async function DashboardPage({ searchParams }: Props) {
   const indicadores = await getIndicadores();
   const perfil = await getPerfilActual();
 
-  // Roles con acceso global pueden elegir el ámbito libremente.
-  // El resto (secretario/subsec/director) queda fijado a su área.
-  const esGlobal =
-    !perfil ||
-    perfil.rol === "intendenta" ||
-    perfil.rol === "admin_funcional" ||
-    perfil.rol === "admin_tecnico";
+  // Quien ve todo puede elegir el ámbito libremente. El resto (secretario/
+  // subsec/director) queda fijado a su área. La marca `acceso_global` (03.08)
+  // habilita el selector sin cambiarle el rol al usuario.
+  const esGlobal = perfilVeTodo(perfil);
 
   const descendientes = (id: string): string[] => {
     const directos = unidades.filter((u) => u.parent_id === id).map((u) => u.id);

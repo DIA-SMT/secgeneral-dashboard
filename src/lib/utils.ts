@@ -520,3 +520,19 @@ export function subtreeUnidades<T extends { id: string; parent_id: string | null
 export function esRolGlobal(rol: string | null | undefined): boolean {
   return rol === "intendenta" || rol === "admin_funcional" || rol === "admin_tecnico" || rol == null;
 }
+
+/**
+ * true si el perfil VE todas las unidades: por su rol, o porque tiene la marca
+ * `acceso_global` (03.08 — el Secretario General ve todas las POAs sin dejar de
+ * ser secretario de su área).
+ *
+ * Ojo: esto es solo VISIBILIDAD. Los permisos de carga siguen saliendo del rol
+ * + su unidad (`getScopeUnidades` / `usuario_puede_cargar_unidad`), que a
+ * propósito no miran esta marca.
+ */
+export function perfilVeTodo(
+  perfil: { rol?: string | null; acceso_global?: boolean | null } | null | undefined
+): boolean {
+  if (!perfil) return esRolGlobal(null);
+  return esRolGlobal(perfil.rol) || perfil.acceso_global === true;
+}

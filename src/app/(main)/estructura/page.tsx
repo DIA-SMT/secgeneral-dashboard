@@ -1,6 +1,6 @@
 import { getUnidades, getPeriodoActivo, getProyectos, getMetasDelPeriodo } from "@/lib/queries";
 import { getPerfilActual } from "@/lib/auth";
-import { esRolGlobal } from "@/lib/utils";
+import { perfilVeTodo } from "@/lib/utils";
 import type { EstadoSemaforo } from "@/types/database";
 import { UnidadNode } from "@/components/estructura/unidad-node";
 
@@ -60,7 +60,7 @@ export default async function EstructuraPage() {
   // Raíz del árbol: para roles globales, las secretarías (nivel 0).
   // Para usuarios con área asignada, arranca en su propia unidad.
   const raiz =
-    !esRolGlobal(perfil?.rol) && perfil?.unidad_id
+    !perfilVeTodo(perfil) && perfil?.unidad_id
       ? unidades.filter((u) => u.id === perfil.unidad_id)
       : unidades.filter((u) => u.parent_id === null).sort(sortByName);
 

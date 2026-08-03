@@ -5,7 +5,7 @@ import { IndicadoresFiltros } from "@/components/indicadores/indicadores-filtros
 import { getPerfilActual } from "@/lib/auth";
 import {
   coincideBusqueda,
-  esRolGlobal,
+  perfilVeTodo,
   estadoIndicadorEnPlazo,
   indicadorCumplido,
   normalizarBusqueda,
@@ -39,7 +39,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
   ]);
   const proyectos = await getProyectos(periodo.id);
   const perfil = await getPerfilActual();
-  const unidadesFiltro = esRolGlobal(perfil?.rol)
+  const unidadesFiltro = perfilVeTodo(perfil)
     ? unidades
     : subtreeUnidades(unidades, perfil?.unidad_id ?? null);
   const proyectoUnidad = new Map(proyectos.map((p) => [p.id, p.unidad]));

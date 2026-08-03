@@ -7,7 +7,7 @@ import {
   type EventoAgenda,
 } from "@/lib/queries";
 import { getPerfilActual } from "@/lib/auth";
-import { coincideBusqueda, esRolGlobal, normalizarBusqueda } from "@/lib/utils";
+import { coincideBusqueda, perfilVeTodo, normalizarBusqueda } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarioToolbar, type VistaCalendario } from "@/components/agenda/calendario-toolbar";
@@ -102,7 +102,7 @@ export default async function AgendaPage({ searchParams }: Props) {
     getAgendasSemana(semanaFoco),
     getPerfilActual(),
   ]);
-  const esGlobal = esRolGlobal(perfil?.rol);
+  const esGlobal = perfilVeTodo(perfil);
 
   const sortByName = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>
     (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre);
