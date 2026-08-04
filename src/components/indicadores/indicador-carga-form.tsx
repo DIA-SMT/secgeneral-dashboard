@@ -89,8 +89,12 @@ export function IndicadorCargaForm({
           indicador_id: indicadorId,
           valor_actual: null,
           valor_actual_texto: valorTxt.trim(),
-          valor_objetivo: null,
-          valor_objetivo_texto: objTxt.trim() || null,
+          // Si no escribieron un objetivo textual, NO se mandan estos campos:
+          // mandarlos en null borraba el objetivo numérico que ya tenía cargado
+          // el indicador y dejaba el avance sin contra qué medirse (03.08).
+          ...(objTxt.trim()
+            ? { valor_objetivo: null, valor_objetivo_texto: objTxt.trim() }
+            : {}),
           unidad_medida: unidad || null,
           observacion: obs || null,
           estado_semaforo_override: estadoTexto,

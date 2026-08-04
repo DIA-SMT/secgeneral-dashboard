@@ -264,6 +264,15 @@ export function MetaCardWithForm({ meta, proyectoId, indicadores = [], puedeCarg
       {/* Formulario inline de carga de avance de la meta (solo cuando puede y lo abrió) */}
       {showForm && (
         <div className="mt-3 space-y-3 border-t border-border pt-3">
+          {indicadores.length > 0 && (
+            <p className="text-[11px] text-warning bg-warning/5 border border-warning/20 rounded-lg px-3 py-2">
+              Esta meta tiene {indicadores.length}{" "}
+              {indicadores.length === 1 ? "indicador" : "indicadores"}: su avance se
+              calcula desde ellos, así que lo que cargues acá queda como registro pero
+              no mueve el porcentaje. Para que se refleje, cargá el valor en el
+              indicador que corresponda.
+            </p>
+          )}
           <AvanceForm meta={meta} proyectoId={proyectoId} onClose={() => setShowForm(false)} />
         </div>
       )}

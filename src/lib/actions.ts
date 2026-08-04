@@ -4,7 +4,14 @@ import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "./supabase/server";
 import { requireValidacionSobreUnidad, requireRol, getPerfilActual, getScopeUnidades } from "./auth";
-import { textoEsVacio, textoEsCero, avanceIndicador, avanceAgregado } from "./utils";
+import {
+  textoEsVacio,
+  textoEsCero,
+  avanceIndicador,
+  avanceAgregado,
+  calcularPorcentajeMeta,
+  estadoDeAvance,
+} from "./utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccionHistorial, RolUsuario } from "@/types/database";
 
@@ -92,15 +99,49 @@ function calcularSemaforo(valor: number | null, objetivo: number | null, base: n
 // su propio estado (cargado con el avance de la meta). Se llama tras cualquier
 // cambio en un indicador para que los conteos de metas (KPI, TV, estructura,
 // chat) queden consistentes con la cascada.
+// -------------------------------------------------------
+// ÚNICO lugar que decide el estado (color) de una meta — 03.08
+// -------------------------------------------------------
+// Antes había dos escrituras con reglas distintas: la carga por indicador
+// recalculaba por cascada, y la carga por meta escribía con umbrales propios
+// (>=80 verde, >=50 amarillo) y forzaba amarillo si la meta no tenía objetivo.
+// Resultado: cargabas en el proyecto y cambiaba el COLOR pero no el PORCENTAJE,
+// porque el porcentaje que se muestra sale de los indicadores.
+//
+// Ahora las dos cargas terminan acá, y esta función aplica exactamente la misma
+// regla que usa la pantalla (`avanceMeta` + `estadoDeAvance`):
+//   * meta CON indicadores → promedio de sus indicadores
+//   * meta SIN indicadores → su propio valor contra su objetivo
+//
+// Nota: el plazo no entra en la cuenta a propósito. El estado por vencimiento
+// cambia día a día y no se puede materializar; se calcula al mostrar.
 async function recomputarEstadoMeta(sb: SupabaseClient, metaId: string): Promise<void> {
   const { data: inds } = await sb
     .from("indicador")
     .select("valor_actual, valor_objetivo, valor_actual_texto, estado_semaforo, metadata")
     .eq("meta_id", metaId)
     .is("deleted_at", null);
-  if (!inds || inds.length === 0) return;
-  const av = avanceAgregado(inds.map((i) => avanceIndicador(i as Parameters<typeof avanceIndicador>[0])));
-  await sb.from("meta").update({ estado_semaforo: av.estado }).eq("id", metaId);
+
+  if (inds && inds.length > 0) {
+    const av = avanceAgregado(
+      inds.map((i) => avanceIndicador(i as Parameters<typeof avanceIndicador>[0]))
+    );
+    await sb.from("meta").update({ estado_semaforo: av.estado }).eq("id", metaId);
+    return;
+  }
+
+  // Sin indicadores: el estado sale del avance propio de la meta.
+  const { data: meta } = await sb
+    .from("meta")
+    .select(
+      "tipo_medicion, valor_actual, valor_meta, valor_linea_base, nivel_actual, escala_cualitativa, metadata"
+    )
+    .eq("id", metaId)
+    .single();
+  if (!meta) return;
+
+  const pct = calcularPorcentajeMeta(meta as Parameters<typeof calcularPorcentajeMeta>[0]);
+  await sb.from("meta").update({ estado_semaforo: estadoDeAvance(pct) }).eq("id", metaId);
 }
 
 // Devuelve el meta_id de un indicador (para recomputar la meta tras un cambio).
@@ -190,88 +231,39 @@ export async function cargarAvance(input: CargarAvanceInput) {
     return { success: false, error: avanceError.message };
   }
 
-  // 2. Actualizar campos materializados en meta
-  // Estos campos son DERIVADOS — se actualizan aqui como proceso controlado.
+  // 2. Actualizar los campos materializados de la meta.
+  // Acá solo se guarda EL VALOR. El estado (color) lo decide después
+  // `recomputarEstadoMeta`, que es el único lugar que lo define y aplica la
+  // misma regla que usa la pantalla (03.08). Antes cada carga escribía el
+  // estado con su propio criterio y por eso el color y el porcentaje se
+  // contradecían.
   const ahora = new Date().toISOString();
 
+  type ValoresMeta = {
+    valor_actual?: number;
+    nivel_actual?: string;
+    ultima_actualizacion: string;
+  };
+  let valores: ValoresMeta | null = null;
+
   if (tipo_medicion === "cuantitativo" && valor_numerico != null) {
-    // Obtener meta para calcular semaforo
-    const { data: meta } = await sb
-      .from("meta")
-      .select("valor_meta, valor_linea_base, fecha_limite, metadata")
-      .eq("id", meta_id)
-      .single();
-
-    // Si la meta tiene valor_meta definido, calculamos pct. Si no (caso común
-    // tras el import inicial donde solo está el enunciado), marcamos la meta
-    // como "EN EJECUCIÓN" (amarillo) para que el dashboard refleje que hay
-    // actividad cargada aunque aún no se haya cuantificado el objetivo.
-    let estado_semaforo = "amarillo";
-    if (meta && meta.valor_meta != null) {
-      const base = (meta.valor_linea_base as number) ?? 0;
-      const objetivo = meta.valor_meta as number;
-      const invertida = (meta.metadata as Record<string, unknown>)?.invertida === true;
-      let pct: number;
-      if (invertida) {
-        pct = objetivo !== base ? ((base - valor_numerico) / (base - objetivo)) * 100 : 0;
-      } else {
-        pct = objetivo !== base ? ((valor_numerico - base) / (objetivo - base)) * 100 : 0;
-      }
-      pct = Math.max(0, Math.min(100, pct));
-      estado_semaforo = pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : "rojo";
-    }
-
-    await sb
-      .from("meta")
-      .update({
-        valor_actual: valor_numerico,
-        estado_semaforo,
-        ultima_actualizacion: ahora,
-      })
-      .eq("id", meta_id);
+    valores = { valor_actual: valor_numerico, ultima_actualizacion: ahora };
+  } else if (tipo_medicion === "cualitativo" && valor_cualitativo) {
+    valores = { nivel_actual: valor_cualitativo, ultima_actualizacion: ahora };
+  } else if (tipo_medicion === "hito_unico") {
+    valores = { valor_actual: 1, ultima_actualizacion: ahora };
   }
 
-  if (tipo_medicion === "cualitativo" && valor_cualitativo) {
-    // Obtener escala para derivar semaforo
-    const { data: meta } = await sb
-      .from("meta")
-      .select("escala_cualitativa")
-      .eq("id", meta_id)
-      .single();
-
-    let estado_semaforo = "sin_datos";
-    if (meta?.escala_cualitativa) {
-      const escala = meta.escala_cualitativa as { niveles: { clave: string; valor_numerico: number }[] };
-      const nivel = escala.niveles.find((n) => n.clave === valor_cualitativo);
-      if (nivel) {
-        const pct = nivel.valor_numerico;
-        estado_semaforo = pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : pct > 0 ? "rojo" : "sin_datos";
-      }
-    }
-
-    await sb
-      .from("meta")
-      .update({
-        nivel_actual: valor_cualitativo,
-        estado_semaforo,
-        ultima_actualizacion: ahora,
-      })
-      .eq("id", meta_id);
-  }
-
-  if (tipo_medicion === "hito_unico") {
-    await sb
-      .from("meta")
-      .update({
-        valor_actual: 1,
-        estado_semaforo: "verde",
-        ultima_actualizacion: ahora,
-      })
-      .eq("id", meta_id);
+  if (valores) {
+    await sb.from("meta").update(valores).eq("id", meta_id);
+    await recomputarEstadoMeta(sb, meta_id);
   }
 
   // 3. Revalidar las paginas que muestran estos datos
   revalidatePath(`/proyectos/${proyecto_id}`);
+  revalidatePath("/proyectos");
+  revalidatePath("/metas");
+  revalidatePath("/avance-direcciones");
   revalidatePath("/dashboard");
   revalidatePath("/tv");
 
@@ -597,15 +589,54 @@ export async function actualizarIndicador(input: {
 }) {
   const {
     indicador_id,
-    valor_actual,
-    valor_actual_texto,
-    valor_objetivo,
-    valor_objetivo_texto,
+    valor_actual: valorActualInput,
+    valor_actual_texto: valorActualTextoInput,
+    valor_objetivo: valorObjetivoInput,
+    valor_objetivo_texto: valorObjetivoTextoInput,
     unidad_medida,
     observacion,
     estado_semaforo_override,
     proyecto_id,
   } = input;
+
+  // -----------------------------------------------------------------
+  // Normalización texto → número (03.08)
+  // -----------------------------------------------------------------
+  // El modo "texto" existe para valores tipo "Sí/No/Realizado", pero se venía
+  // usando también para cargar CANTIDADES ("783"). Guardadas como texto, el
+  // avance del indicador no se puede calcular contra el objetivo: queda fijo en
+  // el 50 % del semáforo y el porcentaje del proyecto no se mueve por más que
+  // se recargue. Ese era el "cargo el avance y no se proyecta en proyectos".
+  //
+  // Si lo que escribieron es un número liso, se guarda como número. Se dejan
+  // afuera los ambiguos ("1.234" puede ser mil doscientos treinta y cuatro o
+  // uno coma dos): esos siguen como texto.
+  const aNumero = (t: string | null | undefined): number | null => {
+    const s = (t ?? "").trim().replace(/\s/g, "");
+    if (!/^-?\d+([.,]\d{1,2})?$/.test(s)) return null;
+    const n = Number(s.replace(",", "."));
+    return isFinite(n) ? n : null;
+  };
+
+  let valor_actual = valorActualInput;
+  let valor_actual_texto = valorActualTextoInput;
+  if (valor_actual == null && valor_actual_texto != null) {
+    const n = aNumero(valor_actual_texto);
+    if (n != null) {
+      valor_actual = n;
+      valor_actual_texto = null;
+    }
+  }
+
+  let valor_objetivo = valorObjetivoInput;
+  let valor_objetivo_texto = valorObjetivoTextoInput;
+  if (valor_objetivo == null && valor_objetivo_texto != null) {
+    const n = aNumero(valor_objetivo_texto);
+    if (n != null) {
+      valor_objetivo = n;
+      valor_objetivo_texto = null;
+    }
+  }
 
   const sb = await getSupabaseServer();
   const { data: ind } = await sb
@@ -873,60 +904,35 @@ export async function corregirAvance(input: {
 
   if (avanceError) return { success: false, error: avanceError.message };
 
-  // 2. Recalcular materializados
+  // 2. Recalcular materializados. Igual que en `cargarAvance` (03.08): acá solo
+  // se guarda el VALOR; el estado lo decide `recomputarEstadoMeta`, que es el
+  // único lugar donde vive esa regla.
   const ahora = new Date().toISOString();
 
+  type ValoresMeta = {
+    valor_actual?: number;
+    nivel_actual?: string;
+    ultima_actualizacion: string;
+  };
+  let valores: ValoresMeta | null = null;
+
   if (tipo_medicion === "cuantitativo" && valor_numerico != null) {
-    const { data: meta } = await sb
-      .from("meta")
-      .select("valor_meta, valor_linea_base, metadata")
-      .eq("id", meta_id)
-      .single();
-
-    const invertida = (meta?.metadata as Record<string, unknown> | undefined)?.invertida === true;
-    const estado = calcularSemaforo(
-      valor_numerico,
-      meta?.valor_meta as number | null,
-      (meta?.valor_linea_base as number | null) ?? 0,
-      invertida
-    );
-
-    await sb
-      .from("meta")
-      .update({
-        valor_actual: valor_numerico,
-        estado_semaforo: estado,
-        ultima_actualizacion: ahora,
-      })
-      .eq("id", meta_id);
+    valores = { valor_actual: valor_numerico, ultima_actualizacion: ahora };
+  } else if (tipo_medicion === "cualitativo" && valor_cualitativo) {
+    valores = { nivel_actual: valor_cualitativo, ultima_actualizacion: ahora };
+  } else if (tipo_medicion === "hito_unico") {
+    valores = { valor_actual: 1, ultima_actualizacion: ahora };
   }
 
-  if (tipo_medicion === "cualitativo" && valor_cualitativo) {
-    const { data: meta } = await sb
-      .from("meta")
-      .select("escala_cualitativa")
-      .eq("id", meta_id)
-      .single();
-    let estado = "sin_datos";
-    if (meta?.escala_cualitativa) {
-      const escala = meta.escala_cualitativa as { niveles: { clave: string; valor_numerico: number }[] };
-      const nivel = escala.niveles.find((n) => n.clave === valor_cualitativo);
-      if (nivel) {
-        const pct = nivel.valor_numerico;
-        estado = pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : pct > 0 ? "rojo" : "sin_datos";
-      }
-    }
-    await sb
-      .from("meta")
-      .update({
-        nivel_actual: valor_cualitativo,
-        estado_semaforo: estado,
-        ultima_actualizacion: ahora,
-      })
-      .eq("id", meta_id);
+  if (valores) {
+    await sb.from("meta").update(valores).eq("id", meta_id);
+    await recomputarEstadoMeta(sb, meta_id);
   }
 
   revalidatePath(`/proyectos/${proyecto_id}`);
+  revalidatePath("/proyectos");
+  revalidatePath("/metas");
+  revalidatePath("/avance-direcciones");
   revalidatePath("/dashboard");
   revalidatePath("/tv");
 
