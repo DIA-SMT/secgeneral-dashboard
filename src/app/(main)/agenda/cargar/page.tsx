@@ -1,4 +1,6 @@
 import { getUnidades, getAgendaSemana, lunesDeSemana } from "@/lib/queries";
+import { getPerfilActual } from "@/lib/auth";
+import { unidadesQuePuedeCargar } from "@/lib/utils";
 import { AgendaCargarForm } from "@/components/agenda/agenda-cargar-form";
 import { BackButton } from "@/components/layout/back-button";
 
@@ -11,10 +13,19 @@ interface Props {
 export default async function CargarAgendaPage({ searchParams }: Props) {
   const params = await searchParams;
   const fechaLunes = params.semana ?? lunesDeSemana();
-  const unidades = await getUnidades();
-  const direcciones = unidades.filter((u) => u.nivel >= 1);
+  const [unidades, perfil] = await Promise.all([getUnidades(), getPerfilActual()]);
 
-  const unidadInicial = params.unidad ?? direcciones[0]?.id ?? "";
+  // 06.08: se ofrecen solo las unidades sobre las que el usuario puede cargar
+  // —incluida la suya, aunque sea una secretaría o subsecretaría— en vez de
+  // "todas las de nivel >= 1". Antes un secretario no podía cargar su agenda.
+  const cargables = unidadesQuePuedeCargar(perfil, unidades);
+  const disponibles = cargables.length > 0 ? cargables : unidades.filter((u) => u.nivel >= 1);
+
+  const unidadInicial =
+    params.unidad ??
+    disponibles.find((u) => u.id === perfil?.unidad_id)?.id ??
+    disponibles[0]?.id ??
+    "";
   const agendaInicial = unidadInicial ? await getAgendaSemana(unidadInicial, fechaLunes) : null;
 
   return (
@@ -29,7 +40,7 @@ export default async function CargarAgendaPage({ searchParams }: Props) {
       </div>
 
       <AgendaCargarForm
-        unidades={direcciones}
+        unidades={disponibles}
         unidadInicial={unidadInicial}
         fechaLunes={fechaLunes}
         agendaInicial={agendaInicial}

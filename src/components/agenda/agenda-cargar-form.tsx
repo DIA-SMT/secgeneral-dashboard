@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { guardarAgendaSemana } from "@/lib/actions";
+import { COLORES_AGENDA } from "@/lib/colores-agenda";
 import type { AgendaSemana, AgendaActividad, UnidadOrganizacional } from "@/types/database";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -15,6 +16,10 @@ interface ActividadLocal {
   actividad: string;
   lugar: string;
   horario: string;
+  // Se editan acá desde el 06.08. Antes no viajaban por el formulario y, como
+  // guardar reemplaza la semana entera, cada re-guardado los borraba.
+  observacion: string;
+  color: string | null;
 }
 
 interface Props {
@@ -48,11 +53,14 @@ export function AgendaCargarForm({ unidades, unidadInicial, fechaLunes, agendaIn
       actividad: a.actividad,
       lugar: a.lugar ?? "",
       horario: a.horario ?? "",
+      observacion: a.observacion ?? "",
+      color: a.color ?? null,
     }))
   );
 
   const sortByName = (a: UnidadOrganizacional, b: UnidadOrganizacional) =>
     (a.nombre_corto ?? a.nombre).localeCompare(b.nombre_corto ?? b.nombre);
+  const secretarias = unidades.filter((u) => u.nivel === 0).sort(sortByName);
   const subsecretarias = unidades.filter((u) => u.nivel === 1).sort(sortByName);
   const direcciones = unidades.filter((u) => u.nivel >= 2).sort(sortByName);
 
@@ -74,6 +82,8 @@ export function AgendaCargarForm({ unidades, unidadInicial, fechaLunes, agendaIn
         actividad: "",
         lugar: "",
         horario: "",
+        observacion: "",
+        color: null,
       },
     ]);
   };
@@ -81,11 +91,21 @@ export function AgendaCargarForm({ unidades, unidadInicial, fechaLunes, agendaIn
   const marcarFeriado = (dia: number) => {
     setActividades((prev) => [
       ...prev.filter((a) => a.dia_semana !== dia),
-      { id: nextId(), dia_semana: dia, orden: 0, es_feriado: true, actividad: "FERIADO", lugar: "", horario: "" },
+      {
+        id: nextId(),
+        dia_semana: dia,
+        orden: 0,
+        es_feriado: true,
+        actividad: "FERIADO",
+        lugar: "",
+        horario: "",
+        observacion: "",
+        color: null,
+      },
     ]);
   };
 
-  const actualizar = (id: string, campo: keyof ActividadLocal, valor: string | boolean) => {
+  const actualizar = (id: string, campo: keyof ActividadLocal, valor: string | boolean | null) => {
     setActividades((prev) => prev.map((a) => (a.id === id ? { ...a, [campo]: valor } : a)));
   };
 
@@ -113,6 +133,8 @@ export function AgendaCargarForm({ unidades, unidadInicial, fechaLunes, agendaIn
               actividad: a.actividad,
               lugar: a.lugar || null,
               horario: a.horario || null,
+              observacion: a.observacion || null,
+              color: a.color,
             }))
           : [],
       });
@@ -135,6 +157,13 @@ export function AgendaCargarForm({ unidades, unidadInicial, fechaLunes, agendaIn
           className="text-sm bg-background border border-border rounded-lg px-3 py-1.5 text-foreground"
         >
           <option value="">Seleccionar...</option>
+          {secretarias.length > 0 && (
+            <optgroup label="Secretarías">
+              {secretarias.map((u) => (
+                <option key={u.id} value={u.id}>{u.nombre_corto ?? u.nombre}</option>
+              ))}
+            </optgroup>
+          )}
           {subsecretarias.length > 0 && (
             <optgroup label="Subsecretarías">
               {subsecretarias.map((u) => (
@@ -226,6 +255,39 @@ export function AgendaCargarForm({ unidades, unidadInicial, fechaLunes, agendaIn
                             placeholder="Horario"
                             className="w-full text-[10px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
                           />
+                          <textarea
+                            value={a.observacion}
+                            onChange={(e) => actualizar(a.id, "observacion", e.target.value)}
+                            rows={2}
+                            placeholder="Descripción"
+                            className="w-full text-[10px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
+                          />
+                          {/* Color de la actividad (06.08). Sin color = el de la unidad. */}
+                          <div className="flex flex-wrap items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => actualizar(a.id, "color", null)}
+                              title="Color de la unidad"
+                              aria-pressed={a.color === null}
+                              className={`h-3.5 w-3.5 rounded-full border bg-border ${
+                                a.color === null ? "ring-1 ring-foreground" : "border-transparent"
+                              }`}
+                            />
+                            {COLORES_AGENDA.map((c) => (
+                              <button
+                                key={c.key}
+                                type="button"
+                                onClick={() => actualizar(a.id, "color", c.key)}
+                                title={c.nombre}
+                                aria-label={c.nombre}
+                                aria-pressed={a.color === c.key}
+                                className={`h-3.5 w-3.5 rounded-full ${
+                                  a.color === c.key ? "ring-1 ring-foreground" : ""
+                                }`}
+                                style={{ backgroundColor: c.hex }}
+                              />
+                            ))}
+                          </div>
                           <button
                             onClick={() => eliminar(a.id)}
                             className="text-[9px] text-danger hover:text-danger/80"

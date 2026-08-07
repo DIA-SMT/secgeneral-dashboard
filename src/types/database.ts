@@ -238,6 +238,8 @@ export interface AgendaActividad {
   lugar: string | null;
   horario: string | null;
   observacion: string | null;
+  // Clave de color de la paleta (06.08). null ⇒ usa el color de la unidad.
+  color: string | null;
   created_at: string;
 }
 

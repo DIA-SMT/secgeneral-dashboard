@@ -7,11 +7,17 @@ import {
   type EventoAgenda,
 } from "@/lib/queries";
 import { getPerfilActual } from "@/lib/auth";
-import { coincideBusqueda, perfilVeTodo, normalizarBusqueda } from "@/lib/utils";
+import {
+  coincideBusqueda,
+  perfilVeTodo,
+  normalizarBusqueda,
+  unidadesQuePuedeCargar,
+} from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarioToolbar, type VistaCalendario } from "@/components/agenda/calendario-toolbar";
 import { CalendarioVista } from "@/components/agenda/calendario-vista";
+import { NuevaActividadForm } from "@/components/agenda/nueva-actividad-form";
 import { SuscribirCalendario } from "@/components/agenda/suscribir-calendario";
 import { tokenDeUnidad } from "@/lib/ics";
 import type { AgendaSemana, UnidadOrganizacional } from "@/types/database";
@@ -169,6 +175,16 @@ export default async function AgendaPage({ searchParams }: Props) {
     indicePorUnidad[id] = Object.keys(indicePorUnidad).length;
   }
 
+  // -------------------------------------------------------
+  // Carga de actividades puntuales (06.08)
+  // -------------------------------------------------------
+  // Sobre qué agendas puede escribir este usuario: su unidad y —para
+  // secretarios y subsecretarios— las de las direcciones a su cargo. Espejo de
+  // la RLS, que es la que realmente decide.
+  const unidadesEditables = unidadesQuePuedeCargar(perfil, unidades).sort(sortByName);
+  const unidadPropia =
+    unidadesEditables.find((u) => u.id === perfil?.unidad_id)?.id ?? unidadesEditables[0]?.id ?? null;
+
   // Feed .ics: el del ámbito filtrado, o el del área propia si no es global.
   const unidadSuscripcion = filtroUnidad ?? (!esGlobal ? perfil?.unidad_id ?? null : null);
 
@@ -206,15 +222,26 @@ export default async function AgendaPage({ searchParams }: Props) {
     );
   };
 
-  // Direcciones a listar abajo: todas las del ámbito visible.
+  // Unidades a listar abajo: las direcciones del ámbito visible.
+  //
+  // 06.08: secretarios y subsecretarios también tienen agenda propia, así que
+  // la unidad raíz entra en la lista cuando es la del usuario o cuando ya tiene
+  // agenda cargada. Sin esto, un secretario veía las agendas de sus direcciones
+  // pero no tenía dónde entrar a la suya.
   const raizFichas = filtroUnidad ?? (ambitoUsuario ? perfil!.unidad_id! : null);
   let direccionesFichas: UnidadOrganizacional[];
   if (raizFichas) {
     const raiz = unidadById.get(raizFichas);
-    direccionesFichas =
-      raiz && raiz.nivel >= 2 ? [raiz, ...direccionesDe(raizFichas)] : direccionesDe(raizFichas);
+    const incluirRaiz =
+      !!raiz &&
+      (raiz.nivel >= 2 || raiz.id === perfil?.unidad_id || agendasPorUnidad.has(raiz.id));
+    direccionesFichas = incluirRaiz
+      ? [raiz!, ...direccionesDe(raizFichas)]
+      : direccionesDe(raizFichas);
   } else {
-    direccionesFichas = unidades.filter((u) => u.nivel >= 2).sort(sortByName);
+    direccionesFichas = unidades
+      .filter((u) => u.nivel >= 2 || agendasPorUnidad.has(u.id))
+      .sort(sortByName);
   }
 
   const semanaLegible = `${Number(semanaFoco.slice(8, 10))} de ${
@@ -261,6 +288,16 @@ export default async function AgendaPage({ searchParams }: Props) {
         mesReferencia={mesReferencia}
         hoy={hoy}
         indicePorUnidad={indicePorUnidad}
+        unidadesEditables={unidadesEditables.map((u) => u.id)}
+        altaDelDia={
+          vista === "dia" ? (
+            <NuevaActividadForm
+              fecha={dias[0]}
+              unidades={unidadesEditables}
+              unidadPorDefecto={unidadPropia}
+            />
+          ) : null
+        }
       />
 
       {/* Leyenda: qué unidad es cada color */}
@@ -300,7 +337,9 @@ export default async function AgendaPage({ searchParams }: Props) {
           <h2 className="text-sm font-semibold text-foreground">
             Agendas de la semana del {semanaLegible}
           </h2>
-          <span className="text-xs text-muted">{direccionesFichas.length} direcciones</span>
+          <span className="text-xs text-muted">
+            {direccionesFichas.length} {direccionesFichas.length === 1 ? "agenda" : "agendas"}
+          </span>
         </div>
         {direccionesFichas.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -309,7 +348,7 @@ export default async function AgendaPage({ searchParams }: Props) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted">No hay direcciones para este filtro.</p>
+          <p className="text-sm text-muted">No hay agendas para este filtro.</p>
         )}
       </section>
     </div>

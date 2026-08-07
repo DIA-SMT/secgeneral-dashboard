@@ -176,7 +176,7 @@ export function IndicadorCargaInline({
                     : "border-border text-muted"
                 }`}
               >
-                {e === "verde" ? "🟢 Finalizado" : e === "amarillo" ? "🟡 En ejecución" : "🔵 No iniciado"}
+                {e === "verde" ? "🟢 Finalizado" : e === "amarillo" ? "🟡 En ejecución" : "🔴 No iniciado"}
               </button>
             ))}
           </div>

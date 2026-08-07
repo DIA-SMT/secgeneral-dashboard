@@ -517,6 +517,29 @@ export function subtreeUnidades<T extends { id: string; parent_id: string | null
   return unidades.filter((u) => ids.has(u.id));
 }
 
+/**
+ * Unidades sobre las que el perfil puede CARGAR. Espejo en TypeScript de
+ * `usuario_puede_cargar_unidad` (SQL) — la RLS sigue siendo la que manda; esto
+ * es solo para no ofrecer en la UI opciones que la base va a rechazar.
+ *
+ * Ojo: `intendenta` y `admin_tecnico` ven todo pero no cargan nada, igual que
+ * en la función SQL.
+ */
+export function unidadesQuePuedeCargar<T extends { id: string; parent_id: string | null }>(
+  perfil: { rol?: string | null; unidad_id?: string | null } | null | undefined,
+  unidades: T[]
+): T[] {
+  if (!perfil) return [];
+  // Copia, no el array de entrada: quien la reciba puede ordenarla in-place.
+  if (perfil.rol === "admin_funcional") return [...unidades];
+  if (!perfil.unidad_id) return [];
+  if (perfil.rol === "director") return unidades.filter((u) => u.id === perfil.unidad_id);
+  if (perfil.rol === "secretario" || perfil.rol === "subsecretario" || perfil.rol === "coordinador") {
+    return subtreeUnidades(unidades, perfil.unidad_id);
+  }
+  return [];
+}
+
 export function esRolGlobal(rol: string | null | undefined): boolean {
   return rol === "intendenta" || rol === "admin_funcional" || rol === "admin_tecnico" || rol == null;
 }

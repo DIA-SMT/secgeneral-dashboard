@@ -250,7 +250,7 @@ export function IndicadorCargaForm({
                     : "border-border text-muted"
                 }`}
               >
-                🔵 No iniciado
+                🔴 No iniciado
               </button>
             </div>
           </div>

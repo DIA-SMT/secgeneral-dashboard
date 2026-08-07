@@ -31,7 +31,7 @@ export function IndicadoresFiltros({ unidades }: { unidades: UnidadOrganizaciona
     { value: "todos", label: "Todos" },
     { value: "verde", label: "🟢 Verde — Finalizado" },
     { value: "amarillo", label: "🟡 Amarillo — En ejecución" },
-    { value: "rojo", label: "🔵 Celeste — No iniciado" },
+    { value: "rojo", label: "🔴 Rojo — No iniciado" },
     { value: "sin_datos", label: "⚪ Sin datos" },
   ];
 

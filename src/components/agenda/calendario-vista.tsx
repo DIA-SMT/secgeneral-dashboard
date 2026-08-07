@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { EventoAgenda } from "@/lib/queries";
 import type { VistaCalendario } from "./calendario-toolbar";
+import { estiloChip, hexDeColor } from "@/lib/colores-agenda";
+import { BorrarActividadBoton } from "./borrar-actividad-boton";
 
 const DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -28,6 +30,10 @@ interface Props {
   hoy: string;
   /** índice de color por unidad, calculado una vez en la página. */
   indicePorUnidad: Record<string, number>;
+  /** Unidades sobre las que el usuario puede cargar (habilita borrar). */
+  unidadesEditables?: string[];
+  /** Formulario de alta para el día en foco (solo vista día). */
+  altaDelDia?: React.ReactNode;
 }
 
 export function CalendarioVista({
@@ -37,7 +43,11 @@ export function CalendarioVista({
   mesReferencia,
   hoy,
   indicePorUnidad,
+  unidadesEditables,
+  altaDelDia,
 }: Props) {
+  const editables = new Set(unidadesEditables ?? []);
+  const puedeCargar = editables.size > 0;
   const porDia = new Map<string, EventoAgenda[]>();
   for (const e of eventos) {
     (porDia.get(e.fecha) ?? porDia.set(e.fecha, []).get(e.fecha)!).push(e);
@@ -48,13 +58,15 @@ export function CalendarioVista({
     const delDia = porDia.get(fecha) ?? [];
     return (
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-border/20">
-          <p className="text-sm font-semibold text-foreground capitalize">
-            {legibleLargo(fecha)}
-          </p>
-          <p className="text-[11px] text-muted">
-            {delDia.length} {delDia.length === 1 ? "actividad" : "actividades"}
-          </p>
+        <div className="px-4 py-3 border-b border-border bg-border/20 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-foreground capitalize">
+              {legibleLargo(fecha)}
+            </p>
+            <p className="text-[11px] text-muted">
+              {delDia.length} {delDia.length === 1 ? "actividad" : "actividades"}
+            </p>
+          </div>
         </div>
         {delDia.length === 0 ? (
           <p className="p-6 text-sm text-muted text-center">Sin actividades cargadas para este día.</p>
@@ -62,11 +74,16 @@ export function CalendarioVista({
           <ul className="divide-y divide-border">
             {delDia.map((e) => (
               <li key={e.id} className="p-3">
-                <EventoFila evento={e} indicePorUnidad={indicePorUnidad} />
+                <EventoFila
+                  evento={e}
+                  indicePorUnidad={indicePorUnidad}
+                  editable={editables.has(e.unidad_id)}
+                />
               </li>
             ))}
           </ul>
         )}
+        {altaDelDia && <div className="p-3 border-t border-border">{altaDelDia}</div>}
       </div>
     );
   }
@@ -94,12 +111,22 @@ export function CalendarioVista({
                   {Number(fecha.slice(8, 10))}
                 </p>
               </div>
-              <div className="p-1.5 space-y-1 flex-1">
-                {delDia.map((e) => (
-                  <EventoChip key={e.id} evento={e} indicePorUnidad={indicePorUnidad} />
-                ))}
-                {delDia.length === 0 && (
-                  <p className="text-[10px] text-muted/50 text-center pt-4">—</p>
+              <div className="p-1.5 space-y-1 flex-1 flex flex-col">
+                <div className="space-y-1 flex-1">
+                  {delDia.map((e) => (
+                    <EventoChip key={e.id} evento={e} indicePorUnidad={indicePorUnidad} />
+                  ))}
+                  {delDia.length === 0 && (
+                    <p className="text-[10px] text-muted/50 text-center pt-4">—</p>
+                  )}
+                </div>
+                {puedeCargar && (
+                  <Link
+                    href={{ pathname: "/agenda", query: { vista: "dia", fecha } }}
+                    className="text-[10px] text-muted hover:text-primary text-center pt-1"
+                  >
+                    + actividad
+                  </Link>
                 )}
               </div>
             </div>
@@ -138,7 +165,20 @@ export function CalendarioVista({
                     otroMes ? "bg-background/40" : ""
                   }`}
                 >
-                  <div className="flex justify-end mb-1">
+                  <div className="flex items-center justify-between mb-1">
+                    {puedeCargar ? (
+                      <Link
+                        href={{ pathname: "/agenda", query: { vista: "dia", fecha } }}
+                        title="Agregar actividad en este día"
+                        className={`text-[11px] h-5 w-5 rounded inline-flex items-center justify-center ${
+                          otroMes ? "text-muted/30" : "text-muted/60 hover:text-primary hover:bg-primary/10"
+                        }`}
+                      >
+                        +
+                      </Link>
+                    ) : (
+                      <span />
+                    )}
                     <Link
                       href={{ pathname: "/agenda", query: { vista: "dia", fecha } }}
                       className={`text-[11px] h-5 min-w-5 px-1 rounded-full inline-flex items-center justify-center ${
@@ -184,6 +224,8 @@ function EventoChip({
   indicePorUnidad: Record<string, number>;
   compacto?: boolean;
 }) {
+  // El color propio de la actividad (06.08) manda sobre el de la unidad.
+  const hex = hexDeColor(evento.color);
   const color = colorDeUnidad(evento.unidad_id, indicePorUnidad[evento.unidad_id] ?? 0);
   return (
     <Link
@@ -191,9 +233,10 @@ function EventoChip({
       title={`${evento.horario ? evento.horario + " · " : ""}${evento.actividad}${
         evento.lugar ? ` · ${evento.lugar}` : ""
       } — ${evento.unidad_nombre}`}
-      className={`block rounded border px-1.5 py-1 hover:brightness-125 transition ${color.chip} ${
-        evento.es_feriado ? "opacity-70 italic" : ""
-      }`}
+      style={hex ? estiloChip(hex) : undefined}
+      className={`block rounded border px-1.5 py-1 hover:brightness-125 transition ${
+        hex ? "" : color.chip
+      } ${evento.es_feriado ? "opacity-70 italic" : ""}`}
     >
       <p className={`${compacto ? "text-[10px]" : "text-[11px]"} font-medium line-clamp-1`}>
         {evento.horario ? <span className="opacity-80">{evento.horario} </span> : null}
@@ -209,28 +252,40 @@ function EventoChip({
 function EventoFila({
   evento,
   indicePorUnidad,
+  editable = false,
 }: {
   evento: EventoAgenda;
   indicePorUnidad: Record<string, number>;
+  editable?: boolean;
 }) {
+  const hex = hexDeColor(evento.color);
   const color = colorDeUnidad(evento.unidad_id, indicePorUnidad[evento.unidad_id] ?? 0);
   return (
-    <Link href={`/agenda/${evento.unidad_id}/${evento.fecha_lunes}`} className="flex items-start gap-3 group">
-      <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${color.punto}`} />
-      <span className="w-20 shrink-0 text-xs text-muted">{evento.horario ?? "—"}</span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-sm text-foreground group-hover:text-primary">
-          {evento.actividad}
+    <div className="flex items-start gap-3">
+      <Link
+        href={`/agenda/${evento.unidad_id}/${evento.fecha_lunes}`}
+        className="flex items-start gap-3 group flex-1 min-w-0"
+      >
+        <span
+          className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${hex ? "" : color.punto}`}
+          style={hex ? { backgroundColor: hex } : undefined}
+        />
+        <span className="w-20 shrink-0 text-xs text-muted">{evento.horario ?? "—"}</span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm text-foreground group-hover:text-primary">
+            {evento.actividad}
+          </span>
+          <span className="block text-[11px] text-muted">
+            {evento.unidad_nombre}
+            {evento.lugar ? ` · ${evento.lugar}` : ""}
+          </span>
+          {evento.observacion && (
+            <span className="block text-[11px] text-muted/80 italic mt-0.5">{evento.observacion}</span>
+          )}
         </span>
-        <span className="block text-[11px] text-muted">
-          {evento.unidad_nombre}
-          {evento.lugar ? ` · ${evento.lugar}` : ""}
-        </span>
-        {evento.observacion && (
-          <span className="block text-[11px] text-muted/80 italic mt-0.5">{evento.observacion}</span>
-        )}
-      </span>
-    </Link>
+      </Link>
+      {editable && <BorrarActividadBoton actividadId={evento.id} actividad={evento.actividad} />}
+    </div>
   );
 }
 

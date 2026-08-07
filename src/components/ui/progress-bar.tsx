@@ -3,7 +3,7 @@ import type { EstadoSemaforo } from "@/types/database";
 const barColors: Record<EstadoSemaforo, string> = {
   verde: "bg-success",
   amarillo: "bg-warning",
-  rojo: "bg-info", // No iniciado → celeste (28.07)
+  rojo: "bg-info", // No iniciado. El token `info` vale rojo desde el 30.07 (ver globals.css)
   gris: "bg-muted/40",
   sin_datos: "bg-muted/20",
 };

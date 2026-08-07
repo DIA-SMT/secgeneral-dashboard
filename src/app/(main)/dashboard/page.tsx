@@ -1,6 +1,7 @@
 import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { SemaforoGauge } from "@/components/ui/semaforo-gauge";
+import { GaugeCumplimiento } from "@/components/ui/gauge-cumplimiento";
+import { EstadoProyectos } from "@/components/dashboard/estado-proyectos";
 import { ProyectoCard } from "@/components/dashboard/proyecto-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { ScopeSelector } from "@/components/dashboard/scope-selector";
@@ -11,7 +12,6 @@ import {
   avanceMetaEnPlazo,
   avanceAgregado,
   avanceGlobalPorConteo,
-  porcentajeDeEstado,
   totalDistribucion,
   perfilVeTodo,
   type AvanceNivel,
@@ -126,49 +126,23 @@ export default async function DashboardPage({ searchParams }: Props) {
   }
 
   // -------------------------------------------------------
-  // Avance global (correcciones 28.07 + 30.07)
+  // Cumplimiento global (28.07 + 30.07, presentación rehecha el 06.08)
   // -------------------------------------------------------
-  // Se mide porcentualmente por CONTEO de proyectos: finalizados + en ejecución
-  // sobre el total del ámbito.
+  // Se mide por CONTEO de proyectos: finalizados + en ejecución sobre el total
+  // del ámbito. Es la fórmula del 28.07 y no cambia.
   //
-  // 30.07: el círculo completo es el 100 %. El anillo pinta SOLO esa porción
-  // ejecutada y deja el resto —lo pendiente por finalizar— en gris.
-  //
-  // 31.07: dentro de esa porción también entran los NO INICIADOS (rojo), que
-  // antes quedaban afuera del anillo. El arco sigue midiendo lo mismo (el % del
-  // centro); lo que cambia es cómo se reparte por dentro: cada estado ocupa un
-  // tramo proporcional a su cantidad. Los "sin datos" siguen fuera del anillo.
-  //
-  // Con un filtro de estado aplicado, el anillo muestra SOLO ese color y el
-  // número del centro pasa a ser el porcentaje de ese color sobre el total.
-  const ESTADOS_GAUGE = ["verde", "amarillo", "rojo", "sin_datos"] as const;
-  const estadoFiltro =
-    ESTADOS_GAUGE.find((e) => e === params.estado) ?? null;
-
+  // 06.08: el filtro de estado de la lista de proyectos YA NO afecta a este
+  // número, ni a los KPI, ni a las tarjetas de estado. Todo el bloque de
+  // arriba mide siempre el ámbito completo; el filtro solo acota la lista.
   const totalAmbito = totalDistribucion(distribucionProyectos);
-  const porcentajeGlobal = estadoFiltro
-    ? porcentajeDeEstado(distribucionProyectos, estadoFiltro)
-    : avanceGlobalPorConteo(distribucionProyectos);
-
-  const segmentosGauge = estadoFiltro
-    ? [{ estado: estadoFiltro, count: distribucionProyectos[estadoFiltro] }]
-    : ([
-        { estado: "verde", count: distribucionProyectos.verde },
-        { estado: "amarillo", count: distribucionProyectos.amarillo },
-        { estado: "rojo", count: distribucionProyectos.rojo },
-      ] as const);
+  const porcentajeGlobal = avanceGlobalPorConteo(distribucionProyectos);
 
   // Hay seguimiento si al menos un proyecto del ámbito tiene datos cargados.
   const tieneSeguimiento =
     distribucionProyectos.verde + distribucionProyectos.amarillo + distribucionProyectos.rojo > 0;
 
-  // Cantidades que se muestran debajo de la rueda del KPI de avance global.
-  const conteosRueda = [
-    { estado: "verde" as const, label: "finalizados", count: distribucionProyectos.verde, dot: "bg-success" },
-    { estado: "amarillo" as const, label: "en ejecución", count: distribucionProyectos.amarillo, dot: "bg-warning" },
-    { estado: "rojo" as const, label: "no iniciados", count: distribucionProyectos.rojo, dot: "bg-info" },
-    { estado: "sin_datos" as const, label: "sin datos", count: distribucionProyectos.sin_datos, dot: "bg-primary/30" },
-  ];
+  const pctSinDatos =
+    totalAmbito > 0 ? Math.round((distribucionProyectos.sin_datos / totalAmbito) * 100) : 0;
 
   // Agrupar por Secretaría: las direcciones que cuelgan directo de una
   // secretaría (sin subsecretaría) también tienen que aparecer.
@@ -178,11 +152,9 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const hayFiltros = !!scopeId || (!!params.estado && params.estado !== "todos");
 
-  // Las cards llevan a su sección arrastrando los filtros del panel:
-  // el ámbito (scope) mapeado al parámetro de cada página y el estado/semáforo.
   const estadoParam = params.estado && params.estado !== "todos" ? params.estado : null;
 
-  // Fija el ámbito del panel sin perder el filtro de estado.
+  // Fija el ámbito del panel sin perder el filtro de estado de la lista.
   const buildScopeHref = (unidadId: string) => {
     const sp = new URLSearchParams();
     sp.set("scope", unidadId);
@@ -190,10 +162,11 @@ export default async function DashboardPage({ searchParams }: Props) {
     return `/dashboard?${sp.toString()}`;
   };
 
+  // Los KPI llevan a su sección con el ÁMBITO solamente: desde el 06.08 sus
+  // valores no dependen del filtro de estado, así que el destino tampoco.
   const buildHref = (base: string, areaKey: "dir" | "unidad") => {
     const sp = new URLSearchParams();
     if (scopeId) sp.set(areaKey, scopeId);
-    if (estadoParam) sp.set("estado", estadoParam);
     const qs = sp.toString();
     return qs ? `${base}?${qs}` : base;
   };
@@ -244,54 +217,98 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
       )}
 
-      {/* KPIs: Avance global → Proyectos → Metas → Indicadores */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="sm:col-span-2 lg:col-span-1 rounded-2xl border border-border bg-surface p-6 flex flex-col items-center gap-3">
-          <p className="text-xs text-muted uppercase tracking-widest font-medium self-start">
-            Avance Global
+      {/* Cumplimiento global + cómo se calcula + leyenda (06.08) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-surface p-6">
+          <p className="text-sm font-semibold text-foreground uppercase tracking-wider">
+            Cumplimiento global del POA
           </p>
-          <SemaforoGauge
-            centerValue={tieneSeguimiento ? porcentajeGlobal : null}
-            segments={[...segmentosGauge]}
-            totalReferencia={totalAmbito}
-            labelPendiente={estadoFiltro ? "Resto del ámbito" : "Pendiente por finalizar"}
-            size={110}
-            strokeWidth={10}
-          />
-          {tieneSeguimiento ? (
-            /* Cantidad de proyectos clasificados, debajo de la rueda (28.07) */
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-              {conteosRueda
-                .filter((c) => c.count > 0)
-                .map((c) => (
-                  <span
-                    key={c.estado}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-muted"
-                    title={`${c.count} de ${totalAmbito} proyectos`}
-                  >
-                    <span className={`h-2 w-2 rounded-full ${c.dot}`} />
-                    <span className="font-semibold text-foreground">{c.count}</span>
-                    {c.label}
-                  </span>
-                ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted/70">Aguardando primer reporte</p>
+          <p className="text-xs text-muted mt-1">
+            Grado de avance de los proyectos sobre el total de proyectos registrados del ámbito.
+          </p>
+          <div className="mt-4">
+            <GaugeCumplimiento value={tieneSeguimiento ? porcentajeGlobal : null} />
+          </div>
+          {!tieneSeguimiento && (
+            <p className="text-sm text-muted/70 text-center">Aguardando primer reporte</p>
           )}
         </div>
 
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-success/25 bg-surface p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-success">
+              ¿Cómo se calcula?
+            </p>
+            <p className="text-xs text-muted leading-relaxed mt-2">
+              El cumplimiento global corresponde a la proporción de proyectos del POA que ya
+              están en marcha sobre el total de proyectos registrados del ámbito.
+            </p>
+            <p className="text-xs text-muted leading-relaxed mt-2">
+              Un proyecto finalizado y uno en ejecución cuentan como avance; los no iniciados y
+              los que todavía no tienen datos cargados aportan 0 %.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-surface p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+              Leyenda de colores
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-3">
+              {[
+                { dot: "bg-success", texto: "Bueno / Completado" },
+                { dot: "bg-info", texto: "Pendiente / Crítico" },
+                { dot: "bg-warning", texto: "En progreso" },
+                { dot: "bg-muted/60", texto: "Sin datos / Requiere atención" },
+              ].map((l) => (
+                <span key={l.texto} className="inline-flex items-center gap-2 text-xs text-muted">
+                  <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${l.dot}`} />
+                  {l.texto}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* KPIs: Proyectos → Metas → Indicadores */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Link href={buildHref("/proyectos", "dir")} className="block hover:scale-[1.02] transition-transform">
-          <KpiCard label="Proyectos" value={proyectosActivos.length} accent="success" />
+          <KpiCard label="Proyectos" value={proyectosActivos.length} sublabel="Total registrados" icon="▦" accent="primary" />
         </Link>
 
         <Link href={buildHref("/metas", "unidad")} className="block hover:scale-[1.02] transition-transform">
-          <KpiCard label="Metas" value={metasScope.length} accent="accent" />
+          <KpiCard label="Metas" value={metasScope.length} sublabel="Total planificadas" icon="◎" accent="accent" />
         </Link>
 
         <Link href={buildHref("/indicadores", "unidad")} className="block hover:scale-[1.02] transition-transform">
-          <KpiCard label="Indicadores" value={totalIndicadoresScope} accent="primary" />
+          <KpiCard label="Indicadores" value={totalIndicadoresScope} sublabel="Total asociados" icon="▤" accent="success" />
         </Link>
       </div>
+
+      {/* Estado de los proyectos */}
+      <div>
+        <p className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
+          Estado de los proyectos
+        </p>
+        <EstadoProyectos distribucion={distribucionProyectos} />
+      </div>
+
+      {/* Aviso: proyectos sin datos */}
+      {distribucionProyectos.sin_datos > 0 && (
+        <div className="rounded-2xl border border-warning/25 bg-warning/5 p-4 flex items-start gap-3">
+          <span className="text-warning text-sm shrink-0 mt-0.5">⚠</span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Proyectos sin datos: {distribucionProyectos.sin_datos} proyectos ({pctSinDatos}%)
+              pendientes de actualización.
+            </p>
+            <p className="text-xs text-muted mt-0.5">
+              La actualización de la información es clave para una gestión eficiente y un
+              seguimiento preciso.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Proyectos */}
       <div>

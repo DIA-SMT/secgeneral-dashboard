@@ -59,6 +59,8 @@ export interface EventoAgenda {
   lugar: string | null;
   observacion: string | null;
   es_feriado: boolean;
+  /** Clave de color propia de la actividad (06.08); null ⇒ color de la unidad. */
+  color: string | null;
 }
 
 /**
@@ -96,6 +98,7 @@ export async function getEventosAgenda(desde: string, hasta: string): Promise<Ev
         lugar: act.lugar,
         observacion: act.observacion,
         es_feriado: act.es_feriado,
+        color: act.color ?? null,
       });
     }
   }

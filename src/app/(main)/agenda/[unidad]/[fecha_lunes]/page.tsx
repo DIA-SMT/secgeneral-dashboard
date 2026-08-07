@@ -1,4 +1,5 @@
 import { getAgendaSemana, getUnidades } from "@/lib/queries";
+import { hexDeColor } from "@/lib/colores-agenda";
 import { BackButton } from "@/components/layout/back-button";
 import { SuscribirCalendario } from "@/components/agenda/suscribir-calendario";
 import { tokenDeUnidad } from "@/lib/ics";
@@ -89,13 +90,23 @@ export default async function AgendaTotemPage({
                   <p className="text-[10px] text-muted/40 italic">Sin actividades</p>
                 ) : (
                   <ul className="space-y-2 flex-1">
-                    {actividades.map((a) => (
-                      <li key={a.id} className="text-[11px] border-l-2 border-primary/30 pl-2">
-                        <p className="font-semibold text-foreground line-clamp-3">{a.actividad}</p>
-                        {a.lugar && <p className="text-muted mt-0.5"><span className="text-muted/60">Lugar:</span> {a.lugar}</p>}
-                        {a.horario && <p className="text-muted"><span className="text-muted/60">Horario:</span> {a.horario}</p>}
-                      </li>
-                    ))}
+                    {actividades.map((a) => {
+                      const hex = hexDeColor(a.color);
+                      return (
+                        <li
+                          key={a.id}
+                          className={`text-[11px] border-l-2 pl-2 ${hex ? "" : "border-primary/30"}`}
+                          style={hex ? { borderColor: hex } : undefined}
+                        >
+                          <p className="font-semibold text-foreground line-clamp-3">{a.actividad}</p>
+                          {a.horario && <p className="text-muted"><span className="text-muted/60">Horario:</span> {a.horario}</p>}
+                          {a.lugar && <p className="text-muted mt-0.5"><span className="text-muted/60">Lugar:</span> {a.lugar}</p>}
+                          {a.observacion && (
+                            <p className="text-muted/80 italic mt-0.5">{a.observacion}</p>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
