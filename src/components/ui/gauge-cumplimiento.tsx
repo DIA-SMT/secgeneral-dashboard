@@ -13,6 +13,8 @@ interface Props {
   size?: number;
   /** Alto de la banda de color. */
   grosor?: number;
+  /** Ancho máximo del SVG. En modo TV se agranda para que se lea de lejos. */
+  claseSvg?: string;
 }
 
 export function GaugeCumplimiento({
@@ -20,6 +22,7 @@ export function GaugeCumplimiento({
   label = "Cumplimiento Global",
   size = 320,
   grosor = 26,
+  claseSvg = "w-full max-w-[340px] h-auto",
 }: Props) {
   const pct = value == null ? 0 : Math.max(0, Math.min(100, value));
 
@@ -61,7 +64,7 @@ export function GaugeCumplimiento({
     <div className="w-full flex flex-col items-center">
       <svg
         viewBox={`0 0 ${size} ${alto}`}
-        className="w-full max-w-[340px] h-auto"
+        className={claseSvg}
         role="img"
         aria-label={`Cumplimiento global: ${value == null ? "sin datos" : `${Math.round(pct)}%`}`}
       >

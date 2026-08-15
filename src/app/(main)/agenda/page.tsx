@@ -257,12 +257,26 @@ export default async function AgendaPage({ searchParams }: Props) {
             Calendario de actividades de todas las direcciones
           </p>
         </div>
-        <Link
-          href={`/agenda/cargar?semana=${semanaFoco}`}
-          className="text-xs text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 rounded-lg px-3 py-1.5 self-start"
-        >
-          + Cargar agenda
-        </Link>
+        <div className="flex items-center gap-2 self-start">
+          {/* El modo TV abre el calendario del mes a pantalla completa */}
+          <Link
+            href={
+              filtroUnidad
+                ? `/tv?vista=calendario&unidad=${filtroUnidad}&fecha=${fecha}`
+                : `/tv?vista=calendario&fecha=${fecha}`
+            }
+            target="_blank"
+            className="text-xs text-muted hover:text-accent border border-border hover:border-accent/30 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5"
+          >
+            <span>▣</span> Modo TV
+          </Link>
+          <Link
+            href={`/agenda/cargar?semana=${semanaFoco}`}
+            className="text-xs text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 rounded-lg px-3 py-1.5"
+          >
+            + Cargar agenda
+          </Link>
+        </div>
       </div>
 
       <Suspense>
