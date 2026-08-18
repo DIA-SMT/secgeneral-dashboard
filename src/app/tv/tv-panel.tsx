@@ -1,4 +1,9 @@
-import { getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
+import {
+  getResumenDashboard,
+  getUnidades,
+  getIndicadoresAvance,
+  type IndicadorAvance,
+} from "@/lib/queries";
 import { GaugeCumplimiento } from "@/components/ui/gauge-cumplimiento";
 import {
   formatFecha,
@@ -12,7 +17,7 @@ import {
   type AvanceNivel,
   type DistribucionEstados,
 } from "@/lib/utils";
-import type { EstadoSemaforo, Meta, Indicador } from "@/types/database";
+import type { EstadoSemaforo, Meta } from "@/types/database";
 
 /**
  * Panel ejecutivo en modo TV. Mismo formato que /dashboard desde las
@@ -32,7 +37,7 @@ export async function TvPanel({
   const [resumen, unidades, indicadores] = await Promise.all([
     getResumenDashboard(periodoId),
     getUnidades(),
-    getIndicadores(),
+    getIndicadoresAvance(periodoId),
   ]);
 
   const proyectosActivos = resumen.proyectos.filter((p) => p.estado === "activo");
@@ -40,8 +45,8 @@ export async function TvPanel({
 
   // Avance por proyecto vía cascada (indicadores → metas → proyecto), igual que
   // el Panel Ejecutivo. Considera el plazo.
-  const indByMeta = new Map<string, Indicador[]>();
-  for (const i of indicadores as Indicador[]) {
+  const indByMeta = new Map<string, IndicadorAvance[]>();
+  for (const i of indicadores) {
     if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
   }
   const avancePorProyecto = new Map<string, AvanceNivel>();

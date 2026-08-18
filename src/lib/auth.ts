@@ -1,11 +1,16 @@
+import { cache } from "react";
 import { getSupabaseServer } from "./supabase/server";
 import type { PerfilUsuario, RolUsuario } from "@/types/database";
 
 /**
  * Devuelve el perfil del usuario autenticado actual (o null si no hay sesión).
  * Usar en Server Components y Server Actions.
+ *
+ * Va con cache() de React (15.08): el layout y la página lo pedían por separado
+ * y cada llamada eran DOS viajes a Supabase (auth.getUser + select del perfil).
+ * El dedupe es por request, así que no se comparte entre usuarios.
  */
-export async function getPerfilActual(): Promise<PerfilUsuario | null> {
+export const getPerfilActual = cache(async function getPerfilActual(): Promise<PerfilUsuario | null> {
   const supabase = await getSupabaseServer();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return null;
@@ -19,7 +24,7 @@ export async function getPerfilActual(): Promise<PerfilUsuario | null> {
 
   if (error || !data) return null;
   return data as PerfilUsuario;
-}
+});
 
 /**
  * Devuelve los ids de unidades visibles para un perfil.

@@ -32,17 +32,18 @@ type IndicadorJoined = Indicador & {
 
 export default async function IndicadoresPage({ searchParams }: Props) {
   const params = await searchParams;
-  const [indicadores, periodo, unidades] = await Promise.all([
+  // 15.08: proyectos y perfil ya no esperan a que terminen los indicadores.
+  const periodo = await getPeriodoActivo();
+  const [indicadores, unidades, proyectos, perfil] = await Promise.all([
     getIndicadores(),
-    getPeriodoActivo(),
     getUnidades(),
+    getProyectos(periodo.id),
+    getPerfilActual(),
   ]);
-  const proyectos = await getProyectos(periodo.id);
-  const perfil = await getPerfilActual();
   const unidadesFiltro = perfilVeTodo(perfil)
     ? unidades
     : subtreeUnidades(unidades, perfil?.unidad_id ?? null);
-  const proyectoUnidad = new Map(proyectos.map((p) => [p.id, p.unidad]));
+  const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
   const unidadById = new Map(unidades.map((u) => [u.id, u]));
   const hoy = new Date().toISOString().slice(0, 10);
 
@@ -76,7 +77,7 @@ export default async function IndicadoresPage({ searchParams }: Props) {
     const uIds = new Set(descendientes(params.unidad));
     filtrados = filtrados.filter((i) => {
       const proyectoId = i.meta?.proyecto?.id;
-      const py = proyectoId ? proyectos.find((p) => p.id === proyectoId) : null;
+      const py = proyectoId ? proyectoById.get(proyectoId) : null;
       return py ? uIds.has(py.unidad_id) : false;
     });
   }

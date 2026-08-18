@@ -1,4 +1,11 @@
-import { getPeriodoActivo, getProyectos, getUnidades, getMetasDelPeriodo, getIndicadores } from "@/lib/queries";
+import {
+  getPeriodoActivo,
+  getProyectos,
+  getUnidades,
+  getMetasDelPeriodo,
+  getIndicadoresAvance,
+  type IndicadorAvance,
+} from "@/lib/queries";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import {
@@ -9,7 +16,7 @@ import {
   type AvanceNivel,
 } from "@/lib/utils";
 import { PlazoBadge } from "@/components/ui/plazo-badge";
-import type { Indicador, UnidadOrganizacional } from "@/types/database";
+import type { UnidadOrganizacional } from "@/types/database";
 import Link from "next/link";
 
 export const revalidate = 60;
@@ -20,19 +27,21 @@ interface Props {
 
 export default async function MetasPage({ searchParams }: Props) {
   const params = await searchParams;
-  const [periodo, unidades] = await Promise.all([
-    getPeriodoActivo(),
+  // 15.08: proyectos, metas e indicadores salen juntos (antes, encadenados).
+  const periodo = await getPeriodoActivo();
+  const [unidades, periodoProyectos, metasDelPeriodo, indicadores] = await Promise.all([
     getUnidades(),
+    getProyectos(periodo.id),
+    getMetasDelPeriodo(periodo.id),
+    getIndicadoresAvance(periodo.id),
   ]);
-  const periodoProyectos = await getProyectos(periodo.id);
 
   const proyectosMap = new Map(periodoProyectos.map((p) => [p.id, p]));
-  let metas = await getMetasDelPeriodo(periodo.id);
-  const indicadores = await getIndicadores();
+  let metas = metasDelPeriodo;
 
   // Avance de cada meta desde sus indicadores (cascada 16.07).
-  const indByMeta = new Map<string, Indicador[]>();
-  for (const i of indicadores as Indicador[]) {
+  const indByMeta = new Map<string, IndicadorAvance[]>();
+  for (const i of indicadores) {
     if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
   }
   const hoy = new Date().toISOString().slice(0, 10);

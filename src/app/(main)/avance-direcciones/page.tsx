@@ -1,8 +1,15 @@
-import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores, getMetasDelPeriodo } from "@/lib/queries";
+import {
+  getPeriodoActivo,
+  getProyectos,
+  getUnidades,
+  getIndicadoresAvance,
+  getMetasDelPeriodo,
+  type IndicadorAvance,
+} from "@/lib/queries";
 import { BackButton } from "@/components/layout/back-button";
 import { avanceMetaEnPlazo, avanceAgregado, calcularPorcentajeMeta, estadoDeAvance } from "@/lib/utils";
 import Link from "next/link";
-import type { Indicador, Meta, UnidadOrganizacional } from "@/types/database";
+import type { Meta, UnidadOrganizacional } from "@/types/database";
 
 export const revalidate = 0;
 
@@ -20,7 +27,7 @@ export default async function AvanceDireccionesPage() {
   const [proyectos, unidades, indicadores, metas] = await Promise.all([
     getProyectos(periodo.id),
     getUnidades(),
-    getIndicadores(),
+    getIndicadoresAvance(periodo.id),
     getMetasDelPeriodo(periodo.id),
   ]);
 
@@ -34,8 +41,8 @@ export default async function AvanceDireccionesPage() {
   };
 
   // Indicadores por meta y metas por proyecto (para la cascada)
-  const indByMeta = new Map<string, Indicador[]>();
-  for (const i of indicadores as Indicador[]) {
+  const indByMeta = new Map<string, IndicadorAvance[]>();
+  for (const i of indicadores) {
     if (i.meta_id) (indByMeta.get(i.meta_id) ?? indByMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
   }
   const metasByProyecto = new Map<string, Meta[]>();

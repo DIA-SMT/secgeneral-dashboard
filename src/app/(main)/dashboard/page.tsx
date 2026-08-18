@@ -1,4 +1,10 @@
-import { getPeriodoActivo, getResumenDashboard, getUnidades, getIndicadores } from "@/lib/queries";
+import {
+  getPeriodoActivo,
+  getResumenDashboard,
+  getUnidades,
+  getIndicadoresAvance,
+  type IndicadorAvance,
+} from "@/lib/queries";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { GaugeCumplimiento } from "@/components/ui/gauge-cumplimiento";
 import { EstadoProyectos } from "@/components/dashboard/estado-proyectos";
@@ -17,7 +23,7 @@ import {
   type AvanceNivel,
 } from "@/lib/utils";
 import { getPerfilActual } from "@/lib/auth";
-import type { Meta, Indicador } from "@/types/database";
+import type { Meta } from "@/types/database";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -29,11 +35,17 @@ interface Props {
 
 export default async function DashboardPage({ searchParams }: Props) {
   const params = await searchParams;
-  const periodo = await getPeriodoActivo();
-  const resumen = await getResumenDashboard(periodo.id);
-  const unidades = await getUnidades();
-  const indicadores = await getIndicadores();
-  const perfil = await getPerfilActual();
+  // 15.08: estas lecturas iban una atrás de la otra. Las que no dependen del
+  // período salen juntas, y el resumen + indicadores también entre sí.
+  const [periodo, unidades, perfil] = await Promise.all([
+    getPeriodoActivo(),
+    getUnidades(),
+    getPerfilActual(),
+  ]);
+  const [resumen, indicadores] = await Promise.all([
+    getResumenDashboard(periodo.id),
+    getIndicadoresAvance(periodo.id),
+  ]);
 
   // Quien ve todo puede elegir el ámbito libremente. El resto (secretario/
   // subsec/director) queda fijado a su área. La marca `acceso_global` (03.08)
@@ -62,23 +74,19 @@ export default async function DashboardPage({ searchParams }: Props) {
   // -------------------------------------------------------
   // Avance basado en INDICADORES (lo que cargan los directores)
   // -------------------------------------------------------
-  type IndConRel = Indicador & { meta?: { proyecto?: { id: string; unidad_id: string } } };
-  const indByMeta = new Map<string, Indicador[]>();
-  const indByUnidad = new Map<string, Indicador[]>();
-  for (const i of indicadores as IndConRel[]) {
+  const indByMeta = new Map<string, IndicadorAvance[]>();
+  for (const i of indicadores) {
     const mId = i.meta_id;
-    const uId = i.meta?.proyecto?.unidad_id;
     if (mId) (indByMeta.get(mId) ?? indByMeta.set(mId, []).get(mId)!).push(i);
-    if (uId) (indByUnidad.get(uId) ?? indByUnidad.set(uId, []).get(uId)!).push(i);
   }
 
   // Indicadores dentro del scope
   const indScope = scopeUnidadIds
-    ? (indicadores as IndConRel[]).filter((i) => {
+    ? indicadores.filter((i) => {
         const uId = i.meta?.proyecto?.unidad_id;
         return uId ? scopeUnidadIds.has(uId) : false;
       })
-    : (indicadores as IndConRel[]);
+    : indicadores;
 
   const totalIndicadoresScope = indScope.length;
 

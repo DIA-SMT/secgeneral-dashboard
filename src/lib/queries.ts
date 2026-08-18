@@ -1,5 +1,6 @@
+import { cache } from "react";
 import { getSupabaseServer } from "./supabase/server";
-import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, EstadoSemaforo, Indicador, IndicadorHistorial, AgendaSemana, AgendaActividad } from "@/types/database";
+import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, Indicador, IndicadorHistorial, AgendaSemana, AgendaActividad } from "@/types/database";
 
 // Devuelve el lunes ISO (YYYY-MM-DD) de la semana de una fecha dada
 export function lunesDeSemana(fecha: Date = new Date()): string {
@@ -127,7 +128,42 @@ export async function getAgendasSemana(fechaLunes: string): Promise<AgendaSemana
 // Se usan desde Server Components.
 // -------------------------------------------------------
 
-export async function getPeriodoActivo(): Promise<Periodo> {
+// ---------------------------------------------------------------------------
+// Paginado (15.08)
+// ---------------------------------------------------------------------------
+// PostgREST corta en 1000 filas. Antes se paginaba con un while que pedía las
+// páginas UNA DETRÁS DE OTRA; con ~1900 indicadores eran dos viajes encadenados
+// de ~1 s cada uno. Ahora la primera página trae el count exacto y las que
+// faltan salen todas juntas.
+const TAMANO_PAGINA = 1000;
+
+type Pagina<T> = { data: T[] | null; error: unknown; count: number | null };
+
+async function traerPaginado<T>(
+  pagina: (desde: number, hasta: number) => PromiseLike<Pagina<T>>
+): Promise<T[]> {
+  const primera = await pagina(0, TAMANO_PAGINA - 1);
+  if (primera.error) throw primera.error;
+  const filas = (primera.data ?? []) as T[];
+  const total = primera.count ?? filas.length;
+  if (filas.length >= total) return filas;
+
+  const pendientes: PromiseLike<Pagina<T>>[] = [];
+  for (let desde = filas.length; desde < total; desde += TAMANO_PAGINA) {
+    pendientes.push(pagina(desde, desde + TAMANO_PAGINA - 1));
+  }
+  for (const r of await Promise.all(pendientes)) {
+    if (r.error) throw r.error;
+    filas.push(...((r.data ?? []) as T[]));
+  }
+  return filas;
+}
+
+// Varias lecturas van envueltas en cache() de React: dedupe POR REQUEST (no
+// entre usuarios, así que la RLS sigue mandando). Sirve porque el layout y la
+// página piden lo mismo, y algunas pantallas piden el período dos veces.
+
+export const getPeriodoActivo = cache(async function getPeriodoActivo(): Promise<Periodo> {
   const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("periodo")
@@ -136,9 +172,9 @@ export async function getPeriodoActivo(): Promise<Periodo> {
     .single();
   if (error) throw error;
   return data as Periodo;
-}
+});
 
-export async function getUnidades(): Promise<UnidadOrganizacional[]> {
+export const getUnidades = cache(async function getUnidades(): Promise<UnidadOrganizacional[]> {
   const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("unidad_organizacional")
@@ -148,19 +184,30 @@ export async function getUnidades(): Promise<UnidadOrganizacional[]> {
     .order("orden");
   if (error) throw error;
   return (data ?? []) as UnidadOrganizacional[];
-}
+});
 
-export async function getProyectos(periodoId: string): Promise<(Proyecto & { unidad: UnidadOrganizacional })[]> {
+// Lo que las pantallas usan de la unidad de un proyecto. El embed traía la fila
+// completa repetida en cada uno de los ~450 proyectos (449 KB → 229 KB).
+export type UnidadResumen = Pick<
+  UnidadOrganizacional,
+  "id" | "nombre" | "nombre_corto" | "nivel" | "parent_id"
+>;
+
+export type ProyectoConUnidad = Proyecto & { unidad: UnidadResumen };
+
+export const getProyectos = cache(async function getProyectos(
+  periodoId: string
+): Promise<ProyectoConUnidad[]> {
   const supabase = await getSupabaseServer();
   const { data, error } = await supabase
     .from("proyecto")
-    .select("*, unidad:unidad_organizacional(*)")
+    .select("*, unidad:unidad_organizacional(id, nombre, nombre_corto, nivel, parent_id)")
     .eq("periodo_id", periodoId)
     .is("deleted_at", null)
     .order("orden");
   if (error) throw error;
-  return (data ?? []) as (Proyecto & { unidad: UnidadOrganizacional })[];
-}
+  return (data ?? []) as ProyectoConUnidad[];
+});
 
 export async function getProyecto(id: string): Promise<Proyecto & { unidad: UnidadOrganizacional }> {
   const supabase = await getSupabaseServer();
@@ -221,27 +268,79 @@ export async function getTodosLosHitos(periodoId: string) {
   return data ?? [];
 }
 
-export async function getIndicadores(): Promise<Indicador[]> {
+// Indicador con lo mínimo de su meta y su proyecto para poder listarlo y
+// agruparlo (/indicadores). Antes el embed traía la meta ENTERA por cada uno de
+// los ~1900 indicadores.
+export type IndicadorConMeta = Indicador & {
+  meta?: {
+    id: string;
+    nombre: string;
+    proyecto?: { id: string; nombre: string; codigo: string | null; unidad_id: string };
+  };
+};
+
+// Indicadores con su meta y su proyecto: solo para la pantalla que los muestra.
+// Para calcular avances está getIndicadoresAvance, que es más liviana todavía.
+export const getIndicadores = cache(async function getIndicadores(): Promise<IndicadorConMeta[]> {
   const supabase = await getSupabaseServer();
-  // Paginar para evitar el límite default de 1000 rows
-  const all: Indicador[] = [];
-  const pageSize = 1000;
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
+  return traerPaginado<IndicadorConMeta>((desde, hasta) =>
+    supabase
       .from("indicador")
-      .select("*, meta:meta(*, proyecto:proyecto(id, nombre, codigo, unidad_id))")
+      .select("*, meta:meta(id, nombre, proyecto:proyecto(id, nombre, codigo, unidad_id))", {
+        count: "exact",
+      })
       .is("deleted_at", null)
       .order("orden")
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const batch = (data ?? []) as Indicador[];
-    all.push(...batch);
-    if (batch.length < pageSize) break;
-    from += pageSize;
-  }
-  return all;
-}
+      .order("id") // desempate: "orden" no es único y el paginado se correría
+      .range(desde, hasta) as unknown as PromiseLike<Pagina<IndicadorConMeta>>
+  );
+});
+
+export type IndicadorAvance = Pick<
+  Indicador,
+  | "id"
+  | "meta_id"
+  | "codigo"
+  | "nombre"
+  | "unidad_medida"
+  | "valor_actual"
+  | "valor_objetivo"
+  | "valor_actual_texto"
+  | "valor_objetivo_texto"
+  | "estado_semaforo"
+  | "ultima_actualizacion"
+  | "orden"
+  | "metadata"
+> & {
+  // Solo lo necesario para ubicar el indicador en el árbol (ámbito del panel).
+  meta?: { id: string; proyecto?: { id: string; periodo_id: string; unidad_id: string } };
+};
+
+/**
+ * Indicadores para el cálculo de avance (15.08). Contra getIndicadores():
+ * sin la meta ni el proyecto anidados, sin columnas de texto largas y acotado
+ * al período. Baja el payload de ~3 MB a ~0,6 MB por pantalla.
+ */
+export const getIndicadoresAvance = cache(async function getIndicadoresAvance(
+  periodoId: string
+): Promise<IndicadorAvance[]> {
+  const supabase = await getSupabaseServer();
+  // El cast es por supabase-js: tipa los embeds como array aunque `meta` sea
+  // una relación uno-a-uno y PostgREST devuelva un objeto.
+  return traerPaginado<IndicadorAvance>((desde, hasta) =>
+    supabase
+      .from("indicador")
+      .select(
+        "id, meta_id, codigo, nombre, unidad_medida, valor_actual, valor_objetivo, valor_actual_texto, valor_objetivo_texto, estado_semaforo, ultima_actualizacion, orden, metadata, meta:meta!inner(id, proyecto:proyecto!inner(id, periodo_id, unidad_id))",
+        { count: "exact" }
+      )
+      .eq("meta.proyecto.periodo_id", periodoId)
+      .is("deleted_at", null)
+      .order("orden")
+      .order("id") // ídem: desempate para que el paginado no se corra
+      .range(desde, hasta) as unknown as PromiseLike<Pagina<IndicadorAvance>>
+  );
+});
 
 // Devuelve totales de indicadores (count + semáforo) filtrados por periodo y
 // opcionalmente por un set de unidad_ids (scope). Se ejecuta server-side para
@@ -311,78 +410,41 @@ export async function getHistorialIndicador(
 // Todas las metas (no borradas) de un período. Filtra vía join inverso a
 // proyecto en vez de mandar cientos de UUIDs en la URL (que dispara
 // HeadersOverflowError cuando hay muchos proyectos). Paginado para no truncar.
-export async function getMetasDelPeriodo(periodoId: string): Promise<Meta[]> {
+export const getMetasDelPeriodo = cache(async function getMetasDelPeriodo(
+  periodoId: string
+): Promise<Meta[]> {
   const supabase = await getSupabaseServer();
-  const metas: Meta[] = [];
-  const pageSize = 1000;
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
+  return traerPaginado<Meta>((desde, hasta) =>
+    supabase
       .from("meta")
-      .select("*, proyecto:proyecto!inner(id, periodo_id)")
+      .select("*, proyecto:proyecto!inner(id, periodo_id)", { count: "exact" })
       .eq("proyecto.periodo_id", periodoId)
       .is("deleted_at", null)
       .order("id")
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const batch = (data ?? []) as Meta[];
-    metas.push(...batch);
-    if (batch.length < pageSize) break;
-    from += pageSize;
-  }
-  return metas;
-}
+      .range(desde, hasta)
+  );
+});
 
-export async function getResumenDashboard(periodoId: string) {
+export const getResumenDashboard = cache(async function getResumenDashboard(periodoId: string) {
   const supabase = await getSupabaseServer();
-  const proyectos = await getProyectos(periodoId);
-  const metas = await getMetasDelPeriodo(periodoId);
 
-  // Indicadores: count vía join inverso (evita mandar 700+ UUIDs en la URL)
-  let totalIndicadores = 0;
-  const indicadoresSemaforo = { verde: 0, amarillo: 0, rojo: 0, sin_datos: 0 };
-  {
-    const estados = ["verde", "amarillo", "rojo", "sin_datos"] as const;
-    const baseQuery = () =>
+  // 15.08: las tres lecturas iban una atrás de la otra (~2,5 s encadenados).
+  // No dependen entre sí, así que van juntas. Los counts de indicadores por
+  // semáforo que había acá se sacaron: nadie los usaba y eran 5 requests más.
+  const [proyectos, metas, hitos] = await Promise.all([
+    getProyectos(periodoId),
+    getMetasDelPeriodo(periodoId),
+    // Hitos del período vía join inverso (mismo motivo que metas).
+    traerPaginado<Hito>((desde, hasta) =>
       supabase
-        .from("indicador")
-        .select("id, meta:meta!inner(id, proyecto:proyecto!inner(id, periodo_id))", {
-          count: "exact",
-          head: true,
-        })
-        .eq("meta.proyecto.periodo_id", periodoId)
-        .is("deleted_at", null);
-
-    const [{ count: total }, ...porEstado] = await Promise.all([
-      baseQuery(),
-      ...estados.map((e) => baseQuery().eq("estado_semaforo", e)),
-    ]);
-    totalIndicadores = total ?? 0;
-    estados.forEach((e, i) => {
-      indicadoresSemaforo[e] = porEstado[i].count ?? 0;
-    });
-  }
-
-  // Hitos del período vía join inverso (mismo motivo que metas).
-  const hitos: Hito[] = [];
-  {
-    const pageSize = 1000;
-    let from = 0;
-    while (true) {
-      const { data, error } = await supabase
         .from("hito")
-        .select("*, proyecto:proyecto!inner(id, periodo_id)")
+        .select("*, proyecto:proyecto!inner(id, periodo_id)", { count: "exact" })
         .eq("proyecto.periodo_id", periodoId)
         .is("deleted_at", null)
         .order("id")
-        .range(from, from + pageSize - 1);
-      if (error) throw error;
-      const batch = (data ?? []) as Hito[];
-      hitos.push(...batch);
-      if (batch.length < pageSize) break;
-      from += pageSize;
-    }
-  }
+        .range(desde, hasta)
+    ),
+  ]);
 
   const metasPorProyecto = new Map<string, Meta[]>();
   for (const m of metas) {
@@ -459,7 +521,5 @@ export async function getResumenDashboard(periodoId: string) {
     hitosTotal,
     hitosVencidos,
     proximoHito,
-    totalIndicadores,
-    indicadoresSemaforo,
   };
-}
+});

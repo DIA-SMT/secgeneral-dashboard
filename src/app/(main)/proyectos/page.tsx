@@ -1,4 +1,11 @@
-import { getPeriodoActivo, getProyectos, getUnidades, getIndicadores, getMetasDelPeriodo } from "@/lib/queries";
+import {
+  getPeriodoActivo,
+  getProyectos,
+  getUnidades,
+  getIndicadoresAvance,
+  getMetasDelPeriodo,
+  type IndicadorAvance,
+} from "@/lib/queries";
 import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
 import {
   calcularAvancePorIndicadores,
@@ -7,7 +14,7 @@ import {
   normalizarBusqueda,
   subtreeUnidades,
 } from "@/lib/utils";
-import type { Meta, UnidadOrganizacional, Indicador } from "@/types/database";
+import type { Meta, UnidadOrganizacional } from "@/types/database";
 import { ProyectosSearch } from "./search";
 import { PoaTree, type PoaIndicador, type PoaMeta, type PoaProyecto } from "@/components/poa/poa-tree";
 import { NuevoProyectoForm } from "@/components/poa/nuevo-proyecto-form";
@@ -21,17 +28,18 @@ interface Props {
 
 export default async function ProyectosPage({ searchParams }: Props) {
   const params = await searchParams;
-  const [periodo, proyectos, unidades, indicadores] = await Promise.all([
-    getPeriodoActivo(),
-    getProyectos((await getPeriodoActivo()).id),
+  // 15.08: todo lo que depende del período sale junto, en vez de encadenar
+  // proyectos → metas → perfil.
+  const periodo = await getPeriodoActivo();
+  const [proyectos, unidades, indicadores, todasMetas, perfil] = await Promise.all([
+    getProyectos(periodo.id),
     getUnidades(),
-    getIndicadores(),
+    getIndicadoresAvance(periodo.id),
+    getMetasDelPeriodo(periodo.id),
+    getPerfilActual(),
   ]);
 
-  const todasMetas = await getMetasDelPeriodo(periodo.id);
-
   // Perfil + scope para saber si el usuario puede cargar avances
-  const perfil = await getPerfilActual();
   const rolesCarga = ["director", "subsecretario", "secretario", "coordinador", "admin_funcional"];
   const puedeCargarBase = !!perfil && rolesCarga.includes(perfil.rol);
   const scopeUnidadesUsuario =
@@ -42,7 +50,7 @@ export default async function ProyectosPage({ searchParams }: Props) {
   for (const m of (todasMetas ?? []) as Meta[]) {
     (metasPorPy.get(m.proyecto_id) ?? metasPorPy.set(m.proyecto_id, []).get(m.proyecto_id)!).push(m);
   }
-  const indPorMeta = new Map<string, Indicador[]>();
+  const indPorMeta = new Map<string, IndicadorAvance[]>();
   for (const i of indicadores) {
     (indPorMeta.get(i.meta_id) ?? indPorMeta.set(i.meta_id, []).get(i.meta_id)!).push(i);
   }
