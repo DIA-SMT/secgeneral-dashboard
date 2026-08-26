@@ -832,12 +832,26 @@ export async function actualizarIndicador(input: {
   if (unidad_medida !== undefined) update.unidad_medida = unidad_medida;
   if (observacion !== undefined) update.observacion = observacion;
 
-  const { error } = await sb
+  // El `.select()` es para saber si la fila se escribió de verdad. Cuando RLS
+  // bloquea un UPDATE, Postgres no encuentra filas que actualizar y Supabase
+  // NO devuelve error: sin esto la carga fallaba en silencio y la función
+  // informaba éxito igual. Desde las pantallas casi no se notaba (el usuario
+  // solo ve indicadores de su ámbito), pero el chatbot puede pedir cualquier
+  // indicador por id, así que ahí sí aparece. (24.08)
+  const { data: filasEscritas, error } = await sb
     .from("indicador")
     .update(update)
-    .eq("id", indicador_id);
+    .eq("id", indicador_id)
+    .select("id");
 
   if (error) return { success: false, error: error.message };
+  if (!filasEscritas || filasEscritas.length === 0) {
+    return {
+      success: false,
+      error:
+        "No se pudo guardar: el indicador no existe o no tenés permisos de carga sobre esa área.",
+    };
+  }
 
   // Trazabilidad: queda registrada la carga con su valor y su fecha (30.07).
   await registrarHistorialIndicador(sb, indicador_id, "carga");

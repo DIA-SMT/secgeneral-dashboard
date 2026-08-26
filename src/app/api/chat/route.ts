@@ -7,9 +7,22 @@ import { getPerfilActual } from "@/lib/auth";
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY!;
 const MODEL = "anthropic/claude-sonnet-4.6";
 
-// Chatbot solo de consulta: la parte operativa (carga / validación / agenda) está
-// oculta de momento. Solo se exponen y ejecutan tools de LECTURA.
-const READ_ONLY_TOOLS = new Set<string>([
+// Lista blanca de lo que el chatbot puede ver y ejecutar. Lo que no está acá
+// no se le muestra al modelo (toolsToOpenAI lo filtra) y tampoco se ejecuta.
+//
+// Todas son de lectura salvo `actualizar_indicador`, habilitada el 24.08 por
+// pedido expreso ("incorporar la posibilidad de cargar datos en los
+// indicadores utilizando el chatbot"). Esa tool delega en el mismo Server
+// Action que la pantalla, así que escribe con la sesión del usuario, respeta
+// RLS y deja rastro en indicador_historial.
+//
+// OJO al agregar tools de escritura acá: las otras ocho de acción
+// (proponer/confirmar avance, hito y agenda, validar y observar) todavía
+// escriben con el cliente anónimo sin sesión de lib/supabase.ts. Con RLS eso
+// no actualiza ninguna fila y Supabase no devuelve error, así que informan
+// éxito sin haber guardado nada. Hay que pasarlas a getSupabaseServer() antes
+// de sumarlas a esta lista.
+const TOOLS_HABILITADAS = new Set<string>([
   "buscar_proyectos",
   "obtener_detalle_proyecto",
   "listar_metas_pendientes",
@@ -19,12 +32,16 @@ const READ_ONLY_TOOLS = new Set<string>([
   "obtener_indicadores_de_meta",
   "listar_avances_pendientes_validacion",
   "obtener_agenda_semana",
+  "actualizar_indicador",
 ]);
 
 // Tool executor
 async function executeTool(name: string, input: Record<string, unknown>): Promise<unknown> {
-  if (!READ_ONLY_TOOLS.has(name)) {
-    return { error: "Esta acción no está disponible. El asistente es solo de consulta." };
+  if (!TOOLS_HABILITADAS.has(name)) {
+    return {
+      error:
+        "Esa acción no está disponible desde el asistente. Se hace desde la pantalla correspondiente del sistema.",
+    };
   }
   switch (name) {
     // --- Lectura ---
@@ -76,7 +93,7 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
 // Convert our tools to OpenAI function format for OpenRouter
 function toolsToOpenAI() {
   return chatTools
-    .filter((t) => READ_ONLY_TOOLS.has(t.name))
+    .filter((t) => TOOLS_HABILITADAS.has(t.name))
     .map((t) => ({
     type: "function" as const,
     function: {

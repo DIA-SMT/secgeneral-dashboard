@@ -211,14 +211,33 @@ export const chatTools: Tool[] = [
   {
     name: "actualizar_indicador",
     description:
-      "Actualiza el valor actual de un indicador. Esta es una acción directa (no requiere propuesta intermedia) pero conviene confirmar brevemente con el usuario antes de invocarla. Solo Directores de la unidad y admin_funcional pueden usarla.",
+      "Carga el valor actual de un indicador. ESCRIBE en la base: invocala SOLO después de que el usuario confirmó explícitamente el valor en su último mensaje. Si no hay confirmación clara, primero mostrale con obtener_indicadores_de_meta el valor que tiene hoy y preguntale si confirma el nuevo. Pasá valor_actual para cantidades y valor_actual_texto para valores cualitativos (Sí/No/Realizado): uno de los dos, nunca los dos juntos. Los permisos los resuelve la base: si el indicador no está en el ámbito de carga del usuario, la operación devuelve error. Cada carga queda registrada en el Historial de Carga con el nombre del usuario y la fecha.",
     input_schema: {
       type: "object" as const,
       properties: {
         indicador_id: { type: "string", description: "UUID del indicador." },
-        valor_actual: { type: "number", description: "Nuevo valor numérico del indicador." },
+        valor_actual: {
+          type: "number",
+          description:
+            "Nuevo valor numérico del indicador. Usar para cantidades, porcentajes o montos.",
+        },
+        valor_actual_texto: {
+          type: "string",
+          description:
+            'Nuevo valor cualitativo ("Sí", "No", "Realizado", "En proceso"). Usar solo cuando el indicador no se mide con un número. Requiere estado_semaforo.',
+        },
+        estado_semaforo: {
+          type: "string",
+          enum: ["verde", "amarillo", "rojo"],
+          description:
+            "Estado del indicador. OBLIGATORIO junto con valor_actual_texto y solo en ese caso: un valor cualitativo no se puede medir contra el objetivo, así que el estado lo tiene que elegir el usuario. verde = Finalizado, amarillo = En ejecución, rojo = No iniciado. Con valor_actual (numérico) NO se manda: el estado se calcula contra el objetivo.",
+        },
+        observacion: {
+          type: "string",
+          description: "Comentario opcional sobre la carga. Queda en el historial.",
+        },
       },
-      required: ["indicador_id", "valor_actual"],
+      required: ["indicador_id"],
     },
   },
 

@@ -1,6 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { avanceIndicador, avanceAgregado, coincideBusqueda, normalizarBusqueda } from "@/lib/utils";
+// La carga de indicadores por chat delega en el Server Action de la pantalla:
+// un solo camino de escritura, con historial y propagación a la meta. (24.08)
+import { actualizarIndicador as actualizarIndicadorAction } from "@/lib/actions";
+import { coincideBusqueda, normalizarBusqueda } from "@/lib/utils";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // -------------------------------------------------------
@@ -662,65 +665,106 @@ export async function obtenerIndicadoresDeMeta(params: { meta_id: string }) {
   };
 }
 
+/**
+ * Carga el valor de un indicador desde el chat (24.08).
+ *
+ * No reimplementa la carga: delega en el Server Action `actualizarIndicador`
+ * de lib/actions.ts, el mismo que usa el formulario de la pantalla. Así hay un
+ * solo camino de escritura, con una sola forma de calcular el semáforo, una
+ * sola normalización texto→número, el historial de carga y la propagación a la
+ * meta. Antes esta tool tenía su propia copia de la fórmula, escribía con el
+ * cliente anónimo sin sesión (RLS la dejaba en cero filas y Supabase no
+ * devuelve error, así que informaba éxito sin haber guardado) y no dejaba
+ * rastro en indicador_historial.
+ *
+ * El permiso lo sigue resolviendo RLS con la sesión real del usuario: acá no
+ * hay ningún chequeo de rol propio que pueda quedar desalineado con la base.
+ */
 export async function actualizarIndicador(params: {
   indicador_id: string;
-  valor_actual: number;
+  valor_actual?: number;
+  valor_actual_texto?: string;
+  estado_semaforo?: "verde" | "amarillo" | "rojo";
+  observacion?: string;
 }) {
-  const { data: ind } = await supabase
+  const tieneNumero = params.valor_actual != null;
+  const tieneTexto =
+    params.valor_actual_texto != null && params.valor_actual_texto.trim() !== "";
+  if (!tieneNumero && !tieneTexto) {
+    return { error: "Falta el valor a cargar: pasá valor_actual o valor_actual_texto." };
+  }
+  if (tieneNumero && tieneTexto) {
+    return { error: "Pasá solo uno de los dos: valor_actual (número) o valor_actual_texto." };
+  }
+  // Un valor numérico se mide contra el objetivo, así que el semáforo se
+  // calcula solo. Uno cualitativo ("Realizado", "Sí") no se puede medir, así
+  // que el estado lo tiene que elegir la persona: es exactamente lo que pide el
+  // formulario de la pantalla, y acá no se adivina.
+  if (tieneTexto && !params.estado_semaforo) {
+    return {
+      error:
+        "Para un valor cualitativo hace falta el estado. Preguntale al usuario si el indicador queda como Finalizado (verde), En ejecución (amarillo) o No iniciado (rojo), y volvé a invocar con estado_semaforo.",
+    };
+  }
+
+  const supabase = await getSupabaseServer();
+
+  // Se lee con la sesión del usuario a propósito: si el indicador está fuera de
+  // su ámbito, RLS no lo devuelve y no hay nada que cargar. Es también de dónde
+  // sale el "antes" para poder informar el cambio.
+  const { data: antes } = await supabase
     .from("indicador")
-    .select("id, nombre, valor_objetivo, metadata, meta_id")
+    .select(
+      "id, nombre, unidad_medida, valor_actual, valor_actual_texto, valor_objetivo, valor_objetivo_texto, estado_semaforo, meta_id"
+    )
     .eq("id", params.indicador_id)
-    .single();
-  if (!ind) return { error: "Indicador no encontrado" };
+    .is("deleted_at", null)
+    .maybeSingle();
 
-  const invertida = ((ind as any).metadata as Record<string, unknown> | undefined)?.invertida === true;
-  const objetivo = (ind as any).valor_objetivo as number | null;
-  let estado = "sin_datos";
-  if (objetivo != null) {
-    let pct: number;
-    if (invertida && objetivo !== 0) {
-      pct = ((0 - params.valor_actual) / (0 - objetivo)) * 100;
-    } else if (objetivo !== 0) {
-      pct = (params.valor_actual / objetivo) * 100;
-    } else {
-      pct = params.valor_actual >= objetivo ? 100 : 0;
-    }
-    pct = Math.max(0, Math.min(100, pct));
-    estado = pct >= 80 ? "verde" : pct >= 50 ? "amarillo" : "rojo";
+  if (!antes) {
+    return { error: "No encontré ese indicador, o está fuera de tu ámbito de visibilidad." };
   }
 
-  const { error } = await supabase
+  const r = await actualizarIndicadorAction({
+    indicador_id: params.indicador_id,
+    // Se manda el par completo para que el valor quede sin ambigüedad: si se
+    // carga un número se limpia el texto viejo y al revés, igual que hace el
+    // formulario de la pantalla.
+    valor_actual: tieneNumero ? params.valor_actual! : null,
+    valor_actual_texto: tieneTexto ? params.valor_actual_texto!.trim() : null,
+    // Solo pesa en el caso cualitativo. Con un número va sin override para que
+    // el estado salga de medir el valor contra el objetivo.
+    estado_semaforo_override: tieneTexto ? params.estado_semaforo! : undefined,
+    observacion: params.observacion ?? undefined,
+  });
+
+  if (!r.success) return { error: r.error ?? "No se pudo guardar el indicador." };
+
+  // Se relee para informar lo que quedó guardado de verdad, no lo que se pidió
+  // guardar: el Server Action puede haber convertido un texto numérico a número
+  // y el semáforo lo recalcula la base.
+  const { data: despues } = await supabase
     .from("indicador")
-    .update({
-      valor_actual: params.valor_actual,
-      estado_semaforo: estado,
-      ultima_actualizacion: new Date().toISOString(),
-    })
-    .eq("id", params.indicador_id);
+    .select(
+      "valor_actual, valor_actual_texto, valor_objetivo, valor_objetivo_texto, unidad_medida, estado_semaforo, ultima_actualizacion"
+    )
+    .eq("id", params.indicador_id)
+    .maybeSingle();
 
-  if (error) return { error: error.message };
-
-  // Propagar a la meta (estado por cascada).
-  const metaId = (ind as any).meta_id as string | undefined;
-  if (metaId) {
-    const { data: inds } = await supabase
-      .from("indicador")
-      .select("valor_actual, valor_objetivo, valor_actual_texto, estado_semaforo, metadata")
-      .eq("meta_id", metaId)
-      .is("deleted_at", null);
-    if (inds && inds.length > 0) {
-      const av = avanceAgregado(inds.map((i) => avanceIndicador(i as Parameters<typeof avanceIndicador>[0])));
-      await supabase.from("meta").update({ estado_semaforo: av.estado }).eq("id", metaId);
-    }
-  }
+  const valorLegible = (v: { valor_actual: unknown; valor_actual_texto: unknown } | null) =>
+    v == null ? null : (v.valor_actual ?? v.valor_actual_texto ?? null);
 
   return {
     success: true,
-    indicador: (ind as any).nombre,
-    valor_actual: params.valor_actual,
-    valor_objetivo: objetivo,
-    semaforo: estado,
-    mensaje: "Indicador actualizado.",
+    indicador: (antes as any).nombre,
+    unidad_medida: (despues as any)?.unidad_medida ?? (antes as any).unidad_medida,
+    valor_anterior: valorLegible(antes as any),
+    valor_cargado: valorLegible(despues as any),
+    valor_objetivo: (despues as any)?.valor_objetivo ?? (antes as any).valor_objetivo,
+    semaforo_anterior: (antes as any).estado_semaforo,
+    semaforo: (despues as any)?.estado_semaforo ?? null,
+    mensaje:
+      "Indicador actualizado. Quedó registrado en el Historial de Carga con tu nombre y la fecha.",
   };
 }
 
