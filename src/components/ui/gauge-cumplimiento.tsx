@@ -87,14 +87,17 @@ export function GaugeCumplimiento({
           strokeLinecap="butt"
         />
 
-        {/* Aguja */}
+        {/* Aguja. Va con el token `fill-foreground` y no con un color fijo:
+            estaba en #F9FAFB, que es el --fg del modo OSCURO, así que en modo
+            claro quedaba blanca sobre la tarjeta blanca y no se veía
+            (corrección 24.08). */}
         {value != null && (
           <>
             <polygon
               points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`}
-              fill="#F9FAFB"
+              className="fill-foreground"
             />
-            <circle cx={base.x} cy={base.y} r={anchoAguja} fill="#F9FAFB" />
+            <circle cx={base.x} cy={base.y} r={anchoAguja} className="fill-foreground" />
           </>
         )}
 
