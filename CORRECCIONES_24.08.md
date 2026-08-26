@@ -221,13 +221,14 @@ las decisiones de las fases anteriores, y va como sección de este documento.
 | 1 | A — contraste modo claro | ~30 min | **hecha** (`e3a7f40`) |
 | 2 | F — teléfonos | ~2 h | **hecha** (`5da0a1b`) · migración 041 aplicada |
 | 3 | D — chatbot escribe indicadores | ~1 día | **hecha** (`36cd163`) |
-| 4 | E + G — alertas dentro del sistema | ~1 día | **hecha** (`a2fb516`) · falta aplicar la 043 |
+| 4 | E + G — alertas dentro del sistema | ~1 día | **hecha** (`a2fb516`) |
 | 5 | B + C — Plan Rector | ~2 semanas | proyecto aparte |
-| 6 | H — Innovación Tecnológica | ~2 h | **hecha** (`4d8ca1f`) · falta aplicar la 042 |
-| 7 | I — respuesta | ~1 h | pendiente |
+| 6 | H — Innovación Tecnológica | ~2 h | **hecha** (`4d8ca1f`) |
+| 7 | I — respuesta | ~1 h | **hecha** (`234a67d`) · ver [INTEGRACION_SISTEMAS_INTERNOS.md](INTEGRACION_SISTEMAS_INTERNOS.md) |
 
-Migraciones a aplicar, en orden: **042** (permisos del director) y **043**
-(alertas). La 041 ya corrió.
+Las migraciones **041, 042 y 043 están todas aplicadas**, y verificadas contra la
+base el 26.08. De las tres páginas del documento queda solo el **Plan Rector**
+(B + C), que se toma como proyecto aparte con su propia matriz de decisiones.
 
 ---
 
@@ -240,7 +241,7 @@ Migraciones a aplicar, en orden: **042** (permisos del director) y **043**
 | 3 | **El Plan Rector entra por XLSX con import versionado**, mismo patrón que el POA 2026 (`supabase/import/`, con `xlsx` que ya está en devDependencies). | Reproducible y auditable en el repo. Si cambia la planilla, se vuelve a correr el import; no hay dependencia viva de Google. |
 | 4 | **Autorizadas las consultas de solo lectura** contra la base de producción. | Se usó para cerrar el diagnóstico de H, verificar el límite de permisos de la fase 3, medir el alcance del cambio de permisos y comparar las policies de agenda antes de reescribirlas. |
 | 5 | **Se arranca por las fases 1-3**; el Plan Rector va como proyecto aparte con su propia matriz de decisiones. | Hecho, y después se sumaron la 4 y la 6. Seis commits chicos y revisables en vez de uno gigante sobre una herramienta en producción. |
-| 6 | **Las migraciones las aplica Lucas.** | La 041 ya corrió. Quedan la 042 y la 043. Hasta que se apliquen, en la rama `lucas`: crear un proyecto en la secretaría rebota por RLS (error claro, no falla silenciosa) y la campanita se muestra vacía. |
+| 6 | **Las migraciones las aplica Lucas.** | Las tres corrieron el 26.08. Verificado con la sesión simulada: el director de Innovación Tecnológica ahora carga y ve su secretaría, y su agenda quedó afuera (`agenda secretaria = false`). En la 043, `authenticated` quedó con permiso solo sobre `leida_at` y cero UPDATE a nivel tabla. |
 | 7 | **El Director pasa a cargar POA en su secretaría, pero NO la agenda.** | `usuario_puede_cargar_unidad` la usaban 10 policies, dos de agenda. Ampliarla sin más le daba a los 53 directores permiso de escritura sobre la agenda de su secretario. La regla de agenda quedó separada en su propia función. |
 
 ---
