@@ -4,8 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
+import { CampanaAlertas } from "./campana-alertas";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
-import type { RolUsuario } from "@/types/database";
+import type { AlertaConLectura, IndicadorPorVencer, RolUsuario } from "@/types/database";
 
 type NavItem = { href: string; label: string; icon: string; roles?: RolUsuario[] };
 
@@ -37,9 +38,13 @@ const rolLabels: Record<RolUsuario, string> = {
 export function Topbar({
   perfilNombre,
   rol,
+  alertas = [],
+  porVencer = [],
 }: {
   perfilNombre: string | null;
   rol: RolUsuario | null;
+  alertas?: AlertaConLectura[];
+  porVencer?: IndicadorPorVencer[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -106,6 +111,7 @@ export function Topbar({
               </button>
             </div>
           )}
+          <CampanaAlertas alertas={alertas} porVencer={porVencer} />
           <ThemeToggle />
         </div>
       </div>
