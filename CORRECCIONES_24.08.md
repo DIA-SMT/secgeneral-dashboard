@@ -218,31 +218,74 @@ las decisiones de las fases anteriores, y va como sección de este documento.
 
 | Fase | Pedido | Esfuerzo | Estado |
 |---|---|---|---|
-| 1 | A — contraste modo claro | ~30 min | listo para arrancar |
-| 2 | F — teléfonos | ~2 h | listo para arrancar |
-| 3 | D — chatbot escribe indicadores | ~1 día | listo para arrancar |
-| 4 | E + G — mensajes de alerta | ~3-4 días | **bloqueada** (canal) |
-| 5 | B + C — Plan Rector | ~2 semanas | **bloqueada** (planilla + modelo) |
-| 6 | H — Innovación Tecnológica | ~1 h + ? | **bloqueada** (diagnóstico) |
+| 1 | A — contraste modo claro | ~30 min | **hecha** (`e3a7f40`) |
+| 2 | F — teléfonos | ~2 h | **hecha** (`5da0a1b`) · falta aplicar la migración 041 |
+| 3 | D — chatbot escribe indicadores | ~1 día | **hecha** (`36cd163`) |
+| 4 | E + G — mensajes de alerta | ~3-4 días | por hacer, canal definido: email |
+| 5 | B + C — Plan Rector | ~2 semanas | proyecto aparte |
+| 6 | H — Innovación Tecnológica | ~1 h | diagnosticada, esperando definición |
 | 7 | I — respuesta | ~1 h | al final |
 
-Las fases 1 a 3 se pueden cerrar sin depender de nadie. Las 4 a 6 necesitan una
-definición antes de empezar.
+---
+
+## 4. Decisiones tomadas (26.08)
+
+| # | Decisión | Consecuencia |
+|---|---|---|
+| 1 | **Las alertas van por email.** Los correos ya están en `perfil_usuario`; se resuelve con un proveedor tipo Resend, sin aprobación de terceros ni costo por mensaje. | La fase 4 no depende de tener los teléfonos cargados. Los teléfonos (fase 2) quedan igual, para cuando se sume WhatsApp. |
+| 2 | **El Plan Rector entra por XLSX con import versionado**, mismo patrón que el POA 2026 (`supabase/import/`, con `xlsx` que ya está en devDependencies). | Reproducible y auditable en el repo. Si cambia la planilla, se vuelve a correr el import; no hay dependencia viva de Google. |
+| 3 | **Autorizadas las consultas de solo lectura** contra la base de producción. | Se usó para cerrar el diagnóstico de H y para verificar el límite de permisos de la fase 3. Ver sección 6. |
+| 4 | **Se arranca por las fases 1-3**; el Plan Rector va como proyecto aparte con su propia matriz de decisiones. | Hecho. Tres commits chicos y revisables en vez de uno gigante sobre una herramienta en producción. |
+| 5 | **La migración 041 la aplica Lucas.** | Mientras no se aplique, la edición de usuarios en la rama `lucas` va a fallar con *"column telefono does not exist"*. Es lo único pendiente de la fase 2. |
 
 ---
 
-## 4. Decisiones pendientes
+## 5. Estado de la base (verificado el 26.08)
 
-| # | Pregunta | Bloquea | Por qué importa |
-|---|---|---|---|
-| 1 | **¿Por qué canal se mandan las alertas?** Email (los correos ya están en la base, se resuelve con un proveedor tipo Resend y es barato) o WhatsApp (necesita los teléfonos de la fase 2 + Meta Cloud API o Twilio, aprobación de plantillas y costo por mensaje). | E, G | Cambia la arquitectura completa de la fase 4, no solo el "cómo se manda". |
-| 2 | **¿Cómo entra la planilla del Plan Rector?** Descarga a XLSX e import versionado (igual que el POA 2026, reproducible y auditable) o sincronización viva con la Google Sheets API (siempre al día, pero se rompe si alguien mueve una columna). | B, C | Define si el Plan Rector es un dato del sistema o un espejo de la planilla. |
-| 3 | **Innovación Tecnológica: ¿me autorizás a correr consultas de solo lectura contra la base de producción** (con el `DATABASE_URL` del `.env`) para ver cómo está cargada la unidad y el perfil? Alternativa: me contás quién es la persona, con qué rol entra y qué error o pantalla ve. | H | Sin esto estoy adivinando. Es la diferencia entre arreglar la causa y parchear un síntoma. |
-| 4 | **¿Arrancamos por las fases 1-3** y el Plan Rector lo tomamos como proyecto aparte con su propia matriz de decisiones? Es lo que recomiendo: mete valor esta semana y no mezcla un subsistema de 2 semanas con arreglos de 30 minutos. | orden | Evita un commit gigante y difícil de revisar sobre una herramienta en producción. |
+Consultas de solo lectura sobre producción. Lo relevante:
+
+- **Todas las migraciones hasta la 040 están aplicadas.** La 041 (teléfono) es la próxima y todavía no corrió.
+- **72 perfiles activos**: 11 secretarios, 3 subsecretarios, 53 directores, 3 coordinadores, 2 admin funcionales. No hay ningún perfil `intendenta` ni `admin_tecnico`. Ese es el volumen de teléfonos a cargar.
+- **Período activo**: "Plan Operativo Anual 2026", correcto.
+- **Innovación Tecnológica** existe y está bien armada: la Secretaría en nivel 0 con 2 direcciones hijas, y `ddsitec@smt.gob.ar` como Secretario de ella. Tiene 0 proyectos propios, pero no por una restricción del sistema.
+
+### El caso H, cerrado
+
+Se evaluó `usuario_puede_cargar_unidad` con la sesión de cada usuario simulada
+(`SET LOCAL request.jwt.claims`, que es como Supabase resuelve `auth.uid()`),
+todo dentro de transacciones con `ROLLBACK`:
+
+| Usuario | Rol | Sobre la Secretaría | Sobre su Dirección | Sobre otras áreas |
+|---|---|---|---|---|
+| `ddsitec@smt.gob.ar` | secretario | **sí** | sí | no |
+| `ditec@smt.gob.ar` | director | **no** | sí | no |
+
+O sea: **el Secretario ya puede cargar proyectos en la Secretaría de Innovación
+Tecnológica.** El Director no, y eso es por diseño —un director carga
+únicamente en su propia dirección, tanto en `crearProyecto()` como en la RLS.
+
+Lo más probable es que el pedido venga de que intentó el Director. Habilitarlo
+no es arreglar un bug: es cambiar una regla de permisos, y esa decisión no la
+tomo yo. Falta confirmar con ellos quién intentó cargar.
 
 ---
 
-## 5. Reglas de trabajo para esta tanda
+## 6. Hallazgos fuera del pedido
+
+Cosas que aparecieron al leer el código y que no son parte de las páginas 36-38.
+Ninguna se tocó todavía; van acá para que no se pierdan.
+
+| # | Hallazgo | Gravedad |
+|---|---|---|
+| 1 | **Las otras 8 tools de escritura del chatbot tienen la misma falla silenciosa** que tenía la de indicadores: escriben con el cliente anónimo sin sesión, RLS las deja en cero filas y Supabase no devuelve error, así que informarían éxito sin guardar. Hoy no hacen daño porque están bloqueadas, pero el que las habilite se lleva la falla puesta. Está anotado en `route.ts`. | media — latente |
+| 2 | **`/tv` devuelve 500 sin sesión.** El middleware la trata como ruta pública, pero la página lee `periodo` con `.single()` y la policy `periodo_select_all` exige `auth.uid() IS NOT NULL`. Funciona en las pantallas de TV porque el navegador quedó logueado una vez. Si a alguna se le cae la sesión, muestra un error en vez del panel. | media |
+| 3 | **El rol `coordinador` no puede crear proyectos.** Está en `rolesCarga`, así que ve el botón "+ Nuevo proyecto" y se le exige elegir área, pero el ternario de `direcciones` en `proyectos/page.tsx` no tiene rama para él y le queda el desplegable vacío. La RLS sí lo permite (migración 029). Afecta a 3 personas. | baja — arreglo de 1 hora |
+| 4 | **`propuesta_carga` no aparece con RLS habilitada** en ninguna migración, a diferencia del resto de las tablas. Conviene confirmarlo contra la base: si es así, es accesible con la clave anónima. | a confirmar |
+| 5 | `COLOR_PENDIENTE = "#4B5563"` en `semaforo-gauge.tsx` sigue siendo un gris oscuro fijo. En modo claro se ve, pero queda fuera de la paleta. No estaba en el pedido. | cosmética |
+
+---
+
+## 7. Reglas de trabajo para esta tanda
 
 - Todo va a la rama `lucas`. `main` es lo que Vercel despliega; no se toca.
 - Un commit por fase, con el mensaje en el estilo del repo (`corrección:`, `estructura:`, `tv:`).
