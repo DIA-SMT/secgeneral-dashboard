@@ -155,6 +155,11 @@ export interface PerfilUsuario {
   user_id: string;
   email: string;
   nombre: string | null;
+  /**
+   * Contacto en formato E.164 (+5493814123456). Nullable: se cargan de a poco.
+   * Se normaliza con `normalizarTelefono` antes de escribir. (24.08)
+   */
+  telefono: string | null;
   rol: RolUsuario;
   unidad_id: string | null;
   activo: boolean;
@@ -270,6 +275,52 @@ type TableDefinition<RowType> = {
 };
 
 // Tipo helper para la DB de Supabase con el shape esperado por supabase-js.
+// ---------------------------------------------------------------------------
+// Alertas dentro del sistema (26.08)
+// ---------------------------------------------------------------------------
+
+/** Mensaje de alerta manual. Las automáticas no se guardan: se calculan. */
+export interface Alerta {
+  id: string;
+  titulo: string;
+  cuerpo: string;
+  /** true => además de la campanita se muestra el cartel arriba de la pantalla. */
+  importante: boolean;
+  /** Último día en que se muestra. null = sin vencimiento. */
+  vigente_hasta: string | null;
+  creado_por: string | null;
+  creado_por_email: string | null;
+  creado_por_nombre: string | null;
+  created_at: string;
+}
+
+export interface AlertaDestinatario {
+  alerta_id: string;
+  user_id: string;
+  leida_at: string | null;
+}
+
+/** Una alerta con el estado de lectura de quien la está consultando. */
+export type AlertaConLectura = Alerta & { leida_at: string | null };
+
+/**
+ * Alerta automática de indicador próximo a vencer. NO existe como fila: se
+ * calcula al leer sobre `indicador.fecha_fin` y el avance del indicador, así
+ * aparece cuando el problema aparece y se va cuando se resuelve.
+ */
+export interface IndicadorPorVencer {
+  indicador_id: string;
+  indicador_nombre: string;
+  proyecto_id: string;
+  proyecto_nombre: string;
+  unidad_nombre: string | null;
+  fecha_fin: string;
+  /** Días desde hoy hasta fecha_fin. 0 = vence hoy. */
+  dias_restantes: number;
+  /** 0-100, o null si no se puede medir. */
+  avance: number | null;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -284,6 +335,8 @@ export interface Database {
       agenda_actividad: TableDefinition<AgendaActividad>;
       perfil_usuario: TableDefinition<PerfilUsuario>;
       ficha_prisma: TableDefinition<FichaPrisma>;
+      alerta: TableDefinition<Alerta>;
+      alerta_destinatario: TableDefinition<AlertaDestinatario>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

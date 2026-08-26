@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { actualizarPerfil, desactivarPerfil, eliminarUsuario } from "@/lib/actions";
+import { formatTelefono, normalizarTelefono } from "@/lib/utils";
 import type { PerfilUsuario, UnidadOrganizacional, RolUsuario } from "@/types/database";
 
 const ROLES: { value: RolUsuario; label: string }[] = [
@@ -31,10 +32,11 @@ export function UsuariosTable({ perfiles, unidades, userIdActual }: Props) {
 
   return (
     <div className="rounded-xl border border-border bg-surface overflow-x-auto">
-      <table className="w-full text-sm min-w-[640px]">
+      <table className="w-full text-sm min-w-[780px]">
         <thead className="bg-border/30 text-xs uppercase tracking-wider text-muted">
           <tr>
             <th className="text-left p-3">Nombre / Email</th>
+            <th className="text-left p-3">Teléfono</th>
             <th className="text-left p-3">Rol</th>
             <th className="text-left p-3">Unidad</th>
             <th className="text-left p-3">Estado</th>
@@ -86,6 +88,7 @@ function UsuarioRow({
   const [rol, setRol] = useState<RolUsuario>(perfil.rol);
   const [unidadId, setUnidadId] = useState<string | null>(perfil.unidad_id);
   const [accesoGlobal, setAccesoGlobal] = useState(perfil.acceso_global ?? false);
+  const [telefono, setTelefono] = useState(perfil.telefono ?? "");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
@@ -103,10 +106,19 @@ function UsuarioRow({
       )
     : unidadesByNivel(nivelEsperado);
 
+  // Se previsualiza acá para que el admin vea cómo va a quedar antes de
+  // guardar, pero el server action vuelve a normalizar: esto es comodidad, no
+  // validación.
+  const telNormalizado = normalizarTelefono(telefono);
+
   const guardar = () => {
     setError(null);
     if (requierUnidad && !unidadId) {
       setError("Este rol requiere asignar una unidad");
+      return;
+    }
+    if (!telNormalizado.ok) {
+      setError(telNormalizado.error);
       return;
     }
     startTransition(async () => {
@@ -115,6 +127,7 @@ function UsuarioRow({
         rol,
         unidad_id: requierUnidad ? unidadId : null,
         acceso_global: accesoGlobal,
+        telefono,
       });
       if (!r.success) setError(r.error ?? "Error al guardar");
       else onCancel();
@@ -146,6 +159,32 @@ function UsuarioRow({
       <td className="p-3">
         <p className="text-foreground font-medium">{perfil.nombre ?? "—"}</p>
         <p className="text-xs text-muted">{perfil.email}</p>
+      </td>
+      <td className="p-3">
+        {editing ? (
+          <>
+            <input
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="381 4123456"
+              inputMode="tel"
+              className="w-36 text-xs bg-background border border-border rounded px-2 py-1"
+            />
+            {telefono.trim() !== "" && (
+              <p
+                className={`text-[10px] mt-1 ${
+                  telNormalizado.ok ? "text-muted" : "text-danger"
+                }`}
+              >
+                {telNormalizado.ok ? `Se guarda: ${telNormalizado.valor}` : telNormalizado.error}
+              </p>
+            )}
+          </>
+        ) : (
+          <span className={`text-xs ${perfil.telefono ? "text-foreground" : "text-muted"}`}>
+            {formatTelefono(perfil.telefono)}
+          </span>
+        )}
       </td>
       <td className="p-3">
         {editing ? (

@@ -13,6 +13,7 @@ import {
   avanceAgregado,
   calcularPorcentajeMeta,
   estadoDeAvance,
+  normalizarTelefono,
 } from "./utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccionHistorial, RolUsuario } from "@/types/database";
@@ -525,6 +526,12 @@ export async function actualizarPerfil(input: {
   unidad_id: string | null;
   /** Ve todas las unidades (solo lectura). No amplía permisos de carga. */
   acceso_global?: boolean;
+  /**
+   * Teléfono tal como lo escribió el admin. Se normaliza acá a E.164 antes de
+   * escribir; el cliente ya lo previsualiza pero no se confía en eso. Cadena
+   * vacía borra el teléfono. (24.08)
+   */
+  telefono?: string | null;
 }) {
   try {
     await requireRol("admin_funcional", "admin_tecnico");
@@ -532,11 +539,21 @@ export async function actualizarPerfil(input: {
     return { success: false, error: (e as Error).message };
   }
   const sb = await getSupabaseServer();
-  const update: { rol: RolUsuario; unidad_id: string | null; acceso_global?: boolean } = {
+  const update: {
+    rol: RolUsuario;
+    unidad_id: string | null;
+    acceso_global?: boolean;
+    telefono?: string | null;
+  } = {
     rol: input.rol,
     unidad_id: input.unidad_id,
   };
   if (input.acceso_global !== undefined) update.acceso_global = input.acceso_global;
+  if (input.telefono !== undefined) {
+    const tel = normalizarTelefono(input.telefono);
+    if (!tel.ok) return { success: false, error: tel.error };
+    update.telefono = tel.valor;
+  }
   const { error } = await sb
     .from("perfil_usuario")
     .update(update)
@@ -815,12 +832,26 @@ export async function actualizarIndicador(input: {
   if (unidad_medida !== undefined) update.unidad_medida = unidad_medida;
   if (observacion !== undefined) update.observacion = observacion;
 
-  const { error } = await sb
+  // El `.select()` es para saber si la fila se escribió de verdad. Cuando RLS
+  // bloquea un UPDATE, Postgres no encuentra filas que actualizar y Supabase
+  // NO devuelve error: sin esto la carga fallaba en silencio y la función
+  // informaba éxito igual. Desde las pantallas casi no se notaba (el usuario
+  // solo ve indicadores de su ámbito), pero el chatbot puede pedir cualquier
+  // indicador por id, así que ahí sí aparece. (24.08)
+  const { data: filasEscritas, error } = await sb
     .from("indicador")
     .update(update)
-    .eq("id", indicador_id);
+    .eq("id", indicador_id)
+    .select("id");
 
   if (error) return { success: false, error: error.message };
+  if (!filasEscritas || filasEscritas.length === 0) {
+    return {
+      success: false,
+      error:
+        "No se pudo guardar: el indicador no existe o no tenés permisos de carga sobre esa área.",
+    };
+  }
 
   // Trazabilidad: queda registrada la carga con su valor y su fecha (30.07).
   await registrarHistorialIndicador(sb, indicador_id, "carga");
@@ -1174,9 +1205,13 @@ export async function crearProyecto(input: {
   }
   if (!input.nombre?.trim()) return { success: false, error: "El nombre del proyecto es obligatorio" };
 
-  // Director solo puede crear en su propia dirección
-  const unidadId = perfil.rol === "director" ? perfil.unidad_id : input.unidad_id;
-  if (!unidadId) return { success: false, error: "Falta la dirección del proyecto" };
+  // El área elegida vale para cualquier rol. Antes el director la tenía forzada
+  // a su propia dirección; desde el 26.08 también puede crear en las unidades
+  // por encima suyo (migración 042), así que el formulario le ofrece la lista y
+  // acá se respeta lo que eligió. Si se manda algo fuera de su ámbito, la RLS
+  // rechaza el INSERT: `proyecto_insert_carga` es la autoridad, no este archivo.
+  const unidadId = input.unidad_id || perfil.unidad_id;
+  if (!unidadId) return { success: false, error: "Falta el área del proyecto" };
 
   const sb = await getSupabaseServer();
   const { data: periodo } = await sb.from("periodo").select("id").eq("activo", true).single();
@@ -1384,5 +1419,156 @@ export async function eliminarMeta(input: { meta_id: string; proyecto_id: string
   if (error) return { success: false, error: error.message };
   revalidatePath(`/proyectos/${input.proyecto_id}`);
   revalidatePath("/proyectos");
+  return { success: true };
+}
+
+// -------------------------------------------------------
+// Server Actions: Alertas dentro del sistema (26.08)
+// -------------------------------------------------------
+
+/**
+ * Manda un mensaje de alerta. El fan-out es explícito: se escribe una fila por
+ * destinatario, también cuando va a todos. Devuelve a cuántos les llegó.
+ *
+ * `destinatarios: "todos"` = todos los perfiles ACTIVOS. Los inactivos quedan
+ * afuera: no entran al sistema, así que una fila para ellos solo ensucia el
+ * "a quién le llegó".
+ */
+export async function crearAlerta(input: {
+  titulo: string;
+  cuerpo: string;
+  importante?: boolean;
+  vigente_hasta?: string | null;
+  destinatarios: "todos" | string[];
+}) {
+  let perfil;
+  try {
+    perfil = await requireRol("admin_funcional", "admin_tecnico");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+
+  const titulo = input.titulo.trim();
+  const cuerpo = input.cuerpo.trim();
+  if (!titulo) return { success: false, error: "El título es obligatorio." };
+  if (titulo.length > 160) return { success: false, error: "El título no puede pasar de 160 caracteres." };
+  if (!cuerpo) return { success: false, error: "El mensaje es obligatorio." };
+  if (cuerpo.length > 2000) return { success: false, error: "El mensaje no puede pasar de 2000 caracteres." };
+  if (input.vigente_hasta && !/^\d{4}-\d{2}-\d{2}$/.test(input.vigente_hasta)) {
+    return { success: false, error: "La fecha de vigencia no es válida." };
+  }
+
+  const sb = await getSupabaseServer();
+
+  // Los destinatarios se resuelven acá, contra la base, y no se toma la lista
+  // que venga del cliente como verdad: si mandaron ids, se intersecan con los
+  // perfiles activos que existen de verdad.
+  let userIds: string[];
+  if (input.destinatarios === "todos") {
+    const { data, error } = await sb
+      .from("perfil_usuario")
+      .select("user_id")
+      .eq("activo", true);
+    if (error) return { success: false, error: error.message };
+    userIds = (data ?? []).map((p) => (p as { user_id: string }).user_id);
+  } else {
+    const pedidos = [...new Set(input.destinatarios)].filter(Boolean);
+    if (pedidos.length === 0) {
+      return { success: false, error: "Elegí al menos un destinatario." };
+    }
+    const { data, error } = await sb
+      .from("perfil_usuario")
+      .select("user_id")
+      .eq("activo", true)
+      .in("user_id", pedidos);
+    if (error) return { success: false, error: error.message };
+    userIds = (data ?? []).map((p) => (p as { user_id: string }).user_id);
+  }
+
+  if (userIds.length === 0) {
+    return { success: false, error: "No quedó ningún destinatario activo." };
+  }
+
+  const { data: alerta, error: errAlerta } = await sb
+    .from("alerta")
+    .insert({
+      titulo,
+      cuerpo,
+      importante: input.importante ?? false,
+      vigente_hasta: input.vigente_hasta || null,
+      creado_por: perfil.user_id,
+      creado_por_email: perfil.email,
+      creado_por_nombre: perfil.nombre,
+    })
+    .select("id")
+    .single();
+  if (errAlerta || !alerta) {
+    return { success: false, error: errAlerta?.message ?? "No se pudo crear la alerta." };
+  }
+
+  const alertaId = (alerta as { id: string }).id;
+  const { error: errDest } = await sb
+    .from("alerta_destinatario")
+    .insert(userIds.map((user_id) => ({ alerta_id: alertaId, user_id })));
+
+  if (errDest) {
+    // Sin destinatarios la alerta no existe para nadie y además nadie la
+    // podría ver para borrarla, así que se limpia antes de devolver el error.
+    await sb.from("alerta").delete().eq("id", alertaId);
+    return { success: false, error: `No se pudo repartir la alerta: ${errDest.message}` };
+  }
+
+  revalidatePath("/admin/alertas");
+  revalidatePath("/dashboard");
+  return { success: true, enviadas: userIds.length };
+}
+
+/** Marca como leída una alerta propia. La RLS acota a las del usuario. */
+export async function marcarAlertaLeida(alertaId: string) {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+
+  const sb = await getSupabaseServer();
+  const { error } = await sb
+    .from("alerta_destinatario")
+    .update({ leida_at: new Date().toISOString() })
+    .eq("alerta_id", alertaId)
+    .eq("user_id", perfil.user_id)
+    .is("leida_at", null);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/** Marca como leídas todas las alertas propias sin leer. */
+export async function marcarTodasLasAlertasLeidas() {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { success: false, error: "No autenticado" };
+
+  const sb = await getSupabaseServer();
+  const { error } = await sb
+    .from("alerta_destinatario")
+    .update({ leida_at: new Date().toISOString() })
+    .eq("user_id", perfil.user_id)
+    .is("leida_at", null);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/** Borra una alerta y, por cascada, sus destinatarios. Solo admins. */
+export async function borrarAlerta(alertaId: string) {
+  try {
+    await requireRol("admin_funcional", "admin_tecnico");
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+  const sb = await getSupabaseServer();
+  const { error } = await sb.from("alerta").delete().eq("id", alertaId);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/alertas");
+  revalidatePath("/dashboard");
   return { success: true };
 }

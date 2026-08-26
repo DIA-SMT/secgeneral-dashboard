@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { getSupabaseServer } from "./supabase/server";
-import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, Indicador, IndicadorHistorial, AgendaSemana, AgendaActividad } from "@/types/database";
+import { avanceIndicador, indicadorCumplido } from "./utils";
+import type { Periodo, UnidadOrganizacional, Proyecto, Meta, Hito, Avance, Indicador, IndicadorHistorial, AgendaSemana, AgendaActividad, Alerta, AlertaConLectura, IndicadorPorVencer } from "@/types/database";
 
 // Devuelve el lunes ISO (YYYY-MM-DD) de la semana de una fecha dada
 export function lunesDeSemana(fecha: Date = new Date()): string {
@@ -522,4 +523,98 @@ export const getResumenDashboard = cache(async function getResumenDashboard(peri
     hitosVencidos,
     proximoHito,
   };
+});
+
+// ---------------------------------------------------------------------------
+// Alertas dentro del sistema (26.08)
+// ---------------------------------------------------------------------------
+
+/**
+ * Las alertas manuales que le llegaron al usuario y todavía están vigentes.
+ * Ordenadas por fecha, las más nuevas primero. RLS ya acota a las propias.
+ */
+export const getAlertasDelUsuario = cache(async function getAlertasDelUsuario(): Promise<
+  AlertaConLectura[]
+> {
+  const supabase = await getSupabaseServer();
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("alerta_destinatario")
+    .select("leida_at, alerta:alerta(*)")
+    .order("created_at", { referencedTable: "alerta", ascending: false })
+    .limit(50);
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as { leida_at: string | null; alerta: Alerta | null }[])
+    .flatMap((d) => (d.alerta ? [{ ...d.alerta, leida_at: d.leida_at }] : []))
+    // Vigencia: se filtra acá y no en la query porque `vigente_hasta` nulo
+    // significa "sin vencimiento" y con un .or() encadenado queda ilegible.
+    .filter((a) => !a.vigente_hasta || a.vigente_hasta >= hoy)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+});
+
+/**
+ * Indicadores del ámbito del usuario que vencen dentro de `dias` y todavía no
+ * llegaron a su objetivo. Es la alerta automática, y NO se guarda en ninguna
+ * tabla: se calcula cada vez, así aparece cuando el indicador está por vencer y
+ * desaparece sola cuando lo cargan.
+ *
+ * Los vencidos quedan afuera a propósito: esto avisa de lo que se puede llegar
+ * a cargar todavía. Lo vencido ya lo muestra el semáforo en rojo.
+ */
+export const getIndicadoresPorVencer = cache(async function getIndicadoresPorVencer(
+  dias = 15
+): Promise<IndicadorPorVencer[]> {
+  const supabase = await getSupabaseServer();
+
+  const hoy = new Date();
+  const desde = hoy.toISOString().slice(0, 10);
+  const hasta = new Date(hoy.getTime() + dias * 86400000).toISOString().slice(0, 10);
+
+  // Los `!inner` con sus filtros son para no avisar por indicadores que cuelgan
+  // de una meta o un proyecto ya borrado: hoy 485 de los 1896 indicadores vivos
+  // pertenecen a metas con deleted_at, y sin esto aparecerían en la campanita
+  // como pendientes de algo que ya no existe.
+  const { data, error } = await supabase
+    .from("indicador")
+    .select(
+      `id, nombre, fecha_fin, valor_actual, valor_actual_texto, valor_objetivo,
+       valor_objetivo_texto, estado_semaforo, metadata,
+       meta:meta!inner(deleted_at,
+         proyecto:proyecto!inner(id, nombre, deleted_at,
+           unidad:unidad_organizacional(nombre_corto, nombre)))`
+    )
+    .is("deleted_at", null)
+    .is("meta.deleted_at", null)
+    .is("meta.proyecto.deleted_at", null)
+    .not("fecha_fin", "is", null)
+    .gte("fecha_fin", desde)
+    .lte("fecha_fin", hasta)
+    .order("fecha_fin")
+    .limit(200);
+  if (error) throw error;
+
+  const unDia = 86400000;
+  const hoyMs = Date.parse(desde);
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  return ((data ?? []) as any[])
+    // Si ya alcanzó el objetivo no hay nada que avisar.
+    .filter((i) => !indicadorCumplido(i))
+    .map((i) => {
+      const proyecto = i.meta?.proyecto ?? null;
+      return {
+        indicador_id: i.id as string,
+        indicador_nombre: i.nombre as string,
+        proyecto_id: (proyecto?.id as string) ?? "",
+        proyecto_nombre: (proyecto?.nombre as string) ?? "(proyecto sin nombre)",
+        unidad_nombre:
+          proyecto?.unidad?.nombre_corto ?? proyecto?.unidad?.nombre ?? null,
+        fecha_fin: i.fecha_fin as string,
+        dias_restantes: Math.round((Date.parse(i.fecha_fin) - hoyMs) / unDia),
+        avance: avanceIndicador(i),
+      };
+    });
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 });

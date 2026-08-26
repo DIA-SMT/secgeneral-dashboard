@@ -27,9 +27,13 @@ export const getPerfilActual = cache(async function getPerfilActual(): Promise<P
 });
 
 /**
- * Devuelve los ids de unidades visibles para un perfil.
+ * Devuelve los ids de unidades sobre las que el perfil opera: es el espejo en
+ * la app de `usuario_puede_cargar_unidad` (SQL), y se usa para decidir qué
+ * mostrar como editable. La RLS sigue siendo la que manda.
  * - intendenta / admins → todas las unidades activas
- * - resto → su unidad + descendientes (via SQL recursivo)
+ * - director → su unidad + descendientes + ANCESTROS (26.08: carga también en
+ *   su subsecretaría y su secretaría)
+ * - resto → su unidad + descendientes
  */
 export async function getScopeUnidades(perfil: PerfilUsuario): Promise<string[]> {
   const supabase = await getSupabaseServer();
@@ -45,10 +49,23 @@ export async function getScopeUnidades(perfil: PerfilUsuario): Promise<string[]>
 
   if (!perfil.unidad_id) return [];
 
+  const idsDe = (data: unknown) =>
+    ((data ?? []) as { id: string }[]).map((row) => row.id);
+
+  if (perfil.rol === "director") {
+    const [descendientes, ancestros] = await Promise.all([
+      supabase.rpc("unidades_descendientes", { p_unidad_id: perfil.unidad_id }),
+      supabase.rpc("unidades_ancestras", { p_unidad_id: perfil.unidad_id }),
+    ]);
+    // `unidades_descendientes` incluye la propia; `unidades_ancestras` no la
+    // repite, pero el Set deja el resultado a prueba de eso igual.
+    return [...new Set([...idsDe(descendientes.data), ...idsDe(ancestros.data)])];
+  }
+
   const { data } = await supabase.rpc("unidades_descendientes", {
     p_unidad_id: perfil.unidad_id,
   });
-  return (data ?? []).map((row: { id: string }) => row.id);
+  return idsDe(data);
 }
 
 /**

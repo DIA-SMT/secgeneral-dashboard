@@ -13,6 +13,7 @@ import {
   perfilVeTodo,
   normalizarBusqueda,
   subtreeUnidades,
+  unidadesQuePuedeCargar,
 } from "@/lib/utils";
 import type { Meta, UnidadOrganizacional } from "@/types/database";
 import { ProyectosSearch } from "./search";
@@ -200,24 +201,13 @@ export default async function ProyectosPage({ searchParams }: Props) {
 
       {puedeCargarBase && perfil && (
         <div className="flex justify-end">
+          {/* Un solo criterio para todos los roles, espejo de la RLS. Antes era
+              un ternario por rol que no tenía rama para `coordinador`: le
+              mostraba el botón con el desplegable vacío, así que no podía crear
+              nada. Y el director no podía elegir área; desde el 26.08 también
+              crea en su secretaría. */}
           <NuevoProyectoForm
-            esAdmin={perfil.rol !== "director"}
-            unidadNombre={
-              perfil.rol === "director"
-                ? unidadById.get(perfil.unidad_id ?? "")?.nombre ?? null
-                : null
-            }
-            direcciones={
-              perfil.rol === "admin_funcional"
-                ? unidades
-                    .filter((u) => u.nivel >= 0)
-                    .sort(sortByNivelNombre)
-                : perfil.rol === "secretario" || perfil.rol === "subsecretario"
-                ? unidades
-                    .filter((u) => u.nivel >= 0 && scopeUnidadesUsuario?.has(u.id))
-                    .sort(sortByNivelNombre)
-                : []
-            }
+            unidades={unidadesQuePuedeCargar(perfil, unidades).sort(sortByNivelNombre)}
           />
         </div>
       )}

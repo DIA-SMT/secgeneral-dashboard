@@ -29,11 +29,14 @@ export function CircularProgress({
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
+        {/* Pista de fondo: token `stroke-border` en vez del #1F2937 fijo, que
+            era el --brd del modo oscuro y en modo claro quedaba gris oscuro
+            sobre blanco (corrección 24.08). */}
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#1F2937"
+          className="stroke-border"
           strokeWidth={strokeWidth}
           fill="none"
         />

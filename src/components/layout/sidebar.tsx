@@ -27,6 +27,12 @@ const navItems: NavItem[] = [
     roles: ["subsecretario", "secretario", "admin_funcional"],
   },
   {
+    href: "/admin/alertas",
+    label: "Avisos",
+    icon: "◔",
+    roles: ["admin_funcional", "admin_tecnico"],
+  },
+  {
     href: "/admin/usuarios",
     label: "Usuarios",
     icon: "⚙",
