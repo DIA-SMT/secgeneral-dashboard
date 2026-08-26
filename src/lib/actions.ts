@@ -13,6 +13,7 @@ import {
   avanceAgregado,
   calcularPorcentajeMeta,
   estadoDeAvance,
+  normalizarTelefono,
 } from "./utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccionHistorial, RolUsuario } from "@/types/database";
@@ -525,6 +526,12 @@ export async function actualizarPerfil(input: {
   unidad_id: string | null;
   /** Ve todas las unidades (solo lectura). No amplía permisos de carga. */
   acceso_global?: boolean;
+  /**
+   * Teléfono tal como lo escribió el admin. Se normaliza acá a E.164 antes de
+   * escribir; el cliente ya lo previsualiza pero no se confía en eso. Cadena
+   * vacía borra el teléfono. (24.08)
+   */
+  telefono?: string | null;
 }) {
   try {
     await requireRol("admin_funcional", "admin_tecnico");
@@ -532,11 +539,21 @@ export async function actualizarPerfil(input: {
     return { success: false, error: (e as Error).message };
   }
   const sb = await getSupabaseServer();
-  const update: { rol: RolUsuario; unidad_id: string | null; acceso_global?: boolean } = {
+  const update: {
+    rol: RolUsuario;
+    unidad_id: string | null;
+    acceso_global?: boolean;
+    telefono?: string | null;
+  } = {
     rol: input.rol,
     unidad_id: input.unidad_id,
   };
   if (input.acceso_global !== undefined) update.acceso_global = input.acceso_global;
+  if (input.telefono !== undefined) {
+    const tel = normalizarTelefono(input.telefono);
+    if (!tel.ok) return { success: false, error: tel.error };
+    update.telefono = tel.valor;
+  }
   const { error } = await sb
     .from("perfil_usuario")
     .update(update)

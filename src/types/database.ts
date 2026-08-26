@@ -155,6 +155,11 @@ export interface PerfilUsuario {
   user_id: string;
   email: string;
   nombre: string | null;
+  /**
+   * Contacto en formato E.164 (+5493814123456). Nullable: se cargan de a poco.
+   * Se normaliza con `normalizarTelefono` antes de escribir. (24.08)
+   */
+  telefono: string | null;
   rol: RolUsuario;
   unidad_id: string | null;
   activo: boolean;

@@ -559,3 +559,102 @@ export function perfilVeTodo(
   if (!perfil) return esRolGlobal(null);
   return esRolGlobal(perfil.rol) || perfil.acceso_global === true;
 }
+
+// -------------------------------------------------------
+// Teléfono de contacto (24.08)
+// -------------------------------------------------------
+
+/** Formato canónico E.164: '+' y entre 8 y 15 dígitos, el primero 1-9. */
+const RE_E164 = /^\+[1-9]\d{7,14}$/;
+
+export type TelefonoNormalizado =
+  | { ok: true; valor: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Lleva un teléfono escrito a mano a E.164, el único formato que se guarda
+ * (ver migración 041). Vacío => null, que es cómo se borra un teléfono.
+ *
+ * Se aceptan estas formas de entrada:
+ *   +5493814123456   ya canónico
+ *   005493814123456  prefijo internacional con 00
+ *   5493814123456    con código de país pero sin '+'
+ *   3814123456       local: área + abonado, sin 0 y sin 15
+ *   03814123456      con el 0 de larga distancia
+ *   0381154123456    con el 0 y el 15 de celular
+ *
+ * A propósito NO adivina más que eso. Un número mal normalizado manda una
+ * alerta a la persona equivocada, así que ante la duda rebota y pide el
+ * formato internacional en vez de arriesgar.
+ *
+ * El 9 de los celulares argentinos: en E.164 va +54 9 <área> <abonado>. Cuando
+ * la entrada es local se asume celular (es el caso de uso: mandar mensajes), y
+ * el 15 —que es la forma local de marcar un celular— se descarta porque en el
+ * formato internacional lo reemplaza ese 9.
+ */
+export function normalizarTelefono(entrada: string | null | undefined): TelefonoNormalizado {
+  const crudo = (entrada ?? "").trim();
+  if (crudo === "") return { ok: true, valor: null };
+
+  const ERROR =
+    "Teléfono inválido. Escribilo como +5493814123456 o como 3814123456 (área + número).";
+
+  // Se descarta todo lo que sea separador: espacios, guiones, puntos, paréntesis.
+  const limpio = crudo.replace(/[\s().-]/g, "");
+  if (!/^\+?\d+$/.test(limpio)) return { ok: false, error: ERROR };
+
+  // Ya viene con código de país explícito.
+  if (limpio.startsWith("+")) {
+    return RE_E164.test(limpio) ? { ok: true, valor: limpio } : { ok: false, error: ERROR };
+  }
+  if (limpio.startsWith("00")) {
+    const e164 = "+" + limpio.slice(2);
+    return RE_E164.test(e164) ? { ok: true, valor: e164 } : { ok: false, error: ERROR };
+  }
+
+  let d = limpio;
+
+  // 0 de larga distancia: en E.164 no va.
+  if (d.startsWith("0")) d = d.slice(1);
+
+  // 15 de celular: sobra en E.164, donde el celular lo marca el 9. El área
+  // argentina tiene 2, 3 o 4 dígitos, así que el 15 puede caer en esas
+  // posiciones; después de sacarlo tienen que quedar los 10 de área + abonado.
+  if (d.length === 12) {
+    const posiciones = [2, 3, 4].filter((i) => d.slice(i, i + 2) === "15");
+    // Con más de un candidato no hay forma de saber cuál es el 15 real.
+    if (posiciones.length === 1) {
+      const i = posiciones[0];
+      d = d.slice(0, i) + d.slice(i + 2);
+    } else if (posiciones.length > 1) {
+      return {
+        ok: false,
+        error: "No se puede interpretar ese número. Escribilo como +5493814123456.",
+      };
+    }
+  }
+
+  // Código de país ya presente, sin '+'.
+  if (d.startsWith("54")) {
+    const e164 = "+" + d;
+    return RE_E164.test(e164) ? { ok: true, valor: e164 } : { ok: false, error: ERROR };
+  }
+
+  // Número local de 10 dígitos (área + abonado): se asume celular argentino.
+  if (d.length === 10) {
+    const e164 = "+549" + d;
+    return RE_E164.test(e164) ? { ok: true, valor: e164 } : { ok: false, error: ERROR };
+  }
+
+  return { ok: false, error: ERROR };
+}
+
+/**
+ * Para mostrar. Se muestra el E.164 tal cual: el largo del código de área
+ * argentino (2, 3 o 4 dígitos) no se puede deducir del número, así que
+ * cualquier agrupado que lo separe sería una invención y un número mal
+ * espaciado se lee como un número equivocado.
+ */
+export function formatTelefono(telefono: string | null | undefined): string {
+  return telefono?.trim() || "—";
+}
