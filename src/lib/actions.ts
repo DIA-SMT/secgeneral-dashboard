@@ -1205,9 +1205,13 @@ export async function crearProyecto(input: {
   }
   if (!input.nombre?.trim()) return { success: false, error: "El nombre del proyecto es obligatorio" };
 
-  // Director solo puede crear en su propia dirección
-  const unidadId = perfil.rol === "director" ? perfil.unidad_id : input.unidad_id;
-  if (!unidadId) return { success: false, error: "Falta la dirección del proyecto" };
+  // El área elegida vale para cualquier rol. Antes el director la tenía forzada
+  // a su propia dirección; desde el 26.08 también puede crear en las unidades
+  // por encima suyo (migración 042), así que el formulario le ofrece la lista y
+  // acá se respeta lo que eligió. Si se manda algo fuera de su ámbito, la RLS
+  // rechaza el INSERT: `proyecto_insert_carga` es la autoridad, no este archivo.
+  const unidadId = input.unidad_id || perfil.unidad_id;
+  if (!unidadId) return { success: false, error: "Falta el área del proyecto" };
 
   const sb = await getSupabaseServer();
   const { data: periodo } = await sb.from("periodo").select("id").eq("activo", true).single();

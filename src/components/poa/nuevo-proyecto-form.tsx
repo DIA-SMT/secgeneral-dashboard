@@ -6,18 +6,21 @@ import { crearProyecto } from "@/lib/actions";
 import type { UnidadOrganizacional } from "@/types/database";
 
 interface Props {
-  // Para admin: lista de direcciones donde puede crear. Para director: vacío (usa su unidad).
-  direcciones?: UnidadOrganizacional[];
-  esAdmin: boolean;
-  unidadNombre?: string | null;
+  /**
+   * Unidades donde este usuario puede crear, ya filtradas por el llamador con
+   * `unidadesQuePuedeCargar`. Si viene una sola, se preselecciona y se muestra
+   * como texto en vez de un desplegable de una opción. (26.08)
+   */
+  unidades?: UnidadOrganizacional[];
 }
 
-export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: Props) {
+export function NuevoProyectoForm({ unidades = [] }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [nombre, setNombre] = useState("");
   const [objetivo, setObjetivo] = useState("");
-  const [unidadId, setUnidadId] = useState("");
+  const unicaUnidad = unidades.length === 1 ? unidades[0] : null;
+  const [unidadId, setUnidadId] = useState(unicaUnidad?.id ?? "");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +30,7 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
       setError("El nombre del proyecto es obligatorio.");
       return;
     }
-    if (esAdmin && !unidadId) {
+    if (!unidadId) {
       setError("Elegí el área del proyecto (secretaría, subsecretaría o dirección).");
       return;
     }
@@ -35,7 +38,7 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
       const r = await crearProyecto({
         nombre,
         objetivo: objetivo || null,
-        unidad_id: unidadId, // para director se ignora y usa su unidad
+        unidad_id: unidadId,
       });
       if (r.success) {
         setNombre("");
@@ -63,10 +66,12 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
   return (
     <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3 w-full">
       <p className="text-sm font-semibold text-foreground">Nuevo proyecto</p>
-      {!esAdmin && unidadNombre && (
-        <p className="text-xs text-muted">Dirección: {unidadNombre}</p>
+      {unicaUnidad && (
+        <p className="text-xs text-muted">
+          Área: {unicaUnidad.nombre_corto ?? unicaUnidad.nombre}
+        </p>
       )}
-      {esAdmin && (
+      {!unicaUnidad && (
         <div>
           <label className="text-[10px] text-muted uppercase tracking-wider">
             Área del proyecto
@@ -77,7 +82,7 @@ export function NuevoProyectoForm({ direcciones = [], esAdmin, unidadNombre }: P
             className="w-full text-sm bg-background border border-border rounded px-3 py-2 mt-0.5"
           >
             <option value="">Seleccionar...</option>
-            {direcciones.map((u) => {
+            {unidades.map((u) => {
               // Indentación por nivel para leer la jerarquía (Secretaría → Dir).
               const sangria = "  ".repeat(Math.max(0, u.nivel));
               const etiqueta =

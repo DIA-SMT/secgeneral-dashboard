@@ -11,7 +11,7 @@ import {
   coincideBusqueda,
   perfilVeTodo,
   normalizarBusqueda,
-  unidadesQuePuedeCargar,
+  unidadesQueGestionaAgenda,
 } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -181,7 +181,7 @@ export default async function AgendaPage({ searchParams }: Props) {
   // Sobre qué agendas puede escribir este usuario: su unidad y —para
   // secretarios y subsecretarios— las de las direcciones a su cargo. Espejo de
   // la RLS, que es la que realmente decide.
-  const unidadesEditables = unidadesQuePuedeCargar(perfil, unidades).sort(sortByName);
+  const unidadesEditables = unidadesQueGestionaAgenda(perfil, unidades).sort(sortByName);
   const unidadPropia =
     unidadesEditables.find((u) => u.id === perfil?.unidad_id)?.id ?? unidadesEditables[0]?.id ?? null;
 

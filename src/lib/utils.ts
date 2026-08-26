@@ -518,12 +518,41 @@ export function subtreeUnidades<T extends { id: string; parent_id: string | null
 }
 
 /**
- * Unidades sobre las que el perfil puede CARGAR. Espejo en TypeScript de
- * `usuario_puede_cargar_unidad` (SQL) — la RLS sigue siendo la que manda; esto
- * es solo para no ofrecer en la UI opciones que la base va a rechazar.
+ * Cadena de unidades por ENCIMA de una: padre, abuelo, etc. No incluye la
+ * propia. Espejo de `unidades_ancestras` (SQL).
+ */
+export function ancestrosUnidades<T extends { id: string; parent_id: string | null }>(
+  unidades: T[],
+  unidadId: string | null
+): T[] {
+  if (!unidadId) return [];
+  const byId = new Map(unidades.map((u) => [u.id, u]));
+  const out: T[] = [];
+  const vistos = new Set<string>([unidadId]);
+  let actual = byId.get(unidadId);
+  // El `vistos` corta la vuelta si algún parent_id quedara ciclado.
+  while (actual?.parent_id && !vistos.has(actual.parent_id)) {
+    vistos.add(actual.parent_id);
+    const padre = byId.get(actual.parent_id);
+    if (!padre) break;
+    out.push(padre);
+    actual = padre;
+  }
+  return out;
+}
+
+/**
+ * Unidades sobre las que el perfil puede cargar POA (proyectos, metas,
+ * indicadores, avances). Espejo en TypeScript de `usuario_puede_cargar_unidad`
+ * (SQL) — la RLS sigue siendo la que manda; esto es solo para no ofrecer en la
+ * UI opciones que la base va a rechazar.
+ *
+ * El director carga en su unidad y en las de arriba (su subsecretaría si tiene,
+ * y su secretaría), no en las direcciones hermanas. (26.08)
  *
  * Ojo: `intendenta` y `admin_tecnico` ven todo pero no cargan nada, igual que
- * en la función SQL.
+ * en la función SQL. Para la agenda semanal la regla es otra: ver
+ * `unidadesQueGestionaAgenda`.
  */
 export function unidadesQuePuedeCargar<T extends { id: string; parent_id: string | null }>(
   perfil: { rol?: string | null; unidad_id?: string | null } | null | undefined,
@@ -531,6 +560,31 @@ export function unidadesQuePuedeCargar<T extends { id: string; parent_id: string
 ): T[] {
   if (!perfil) return [];
   // Copia, no el array de entrada: quien la reciba puede ordenarla in-place.
+  if (perfil.rol === "admin_funcional") return [...unidades];
+  if (!perfil.unidad_id) return [];
+  if (perfil.rol === "director") {
+    const propia = unidades.filter((u) => u.id === perfil.unidad_id);
+    return [...propia, ...ancestrosUnidades(unidades, perfil.unidad_id)];
+  }
+  if (perfil.rol === "secretario" || perfil.rol === "subsecretario" || perfil.rol === "coordinador") {
+    return subtreeUnidades(unidades, perfil.unidad_id);
+  }
+  return [];
+}
+
+/**
+ * Unidades cuya AGENDA SEMANAL puede editar el perfil. Espejo de
+ * `usuario_puede_gestionar_agenda_unidad` (SQL).
+ *
+ * Es la regla que valía para todo hasta el 26.08. Cuando se amplió el permiso
+ * de carga del POA a los ancestros del director, la agenda quedó afuera a
+ * propósito: un director no edita la agenda de su secretario.
+ */
+export function unidadesQueGestionaAgenda<T extends { id: string; parent_id: string | null }>(
+  perfil: { rol?: string | null; unidad_id?: string | null } | null | undefined,
+  unidades: T[]
+): T[] {
+  if (!perfil) return [];
   if (perfil.rol === "admin_funcional") return [...unidades];
   if (!perfil.unidad_id) return [];
   if (perfil.rol === "director") return unidades.filter((u) => u.id === perfil.unidad_id);
