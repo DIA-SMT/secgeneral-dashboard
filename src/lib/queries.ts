@@ -572,14 +572,22 @@ export const getIndicadoresPorVencer = cache(async function getIndicadoresPorVen
   const desde = hoy.toISOString().slice(0, 10);
   const hasta = new Date(hoy.getTime() + dias * 86400000).toISOString().slice(0, 10);
 
+  // Los `!inner` con sus filtros son para no avisar por indicadores que cuelgan
+  // de una meta o un proyecto ya borrado: hoy 485 de los 1896 indicadores vivos
+  // pertenecen a metas con deleted_at, y sin esto aparecerían en la campanita
+  // como pendientes de algo que ya no existe.
   const { data, error } = await supabase
     .from("indicador")
     .select(
       `id, nombre, fecha_fin, valor_actual, valor_actual_texto, valor_objetivo,
        valor_objetivo_texto, estado_semaforo, metadata,
-       meta:meta(proyecto:proyecto(id, nombre, unidad:unidad_organizacional(nombre_corto, nombre)))`
+       meta:meta!inner(deleted_at,
+         proyecto:proyecto!inner(id, nombre, deleted_at,
+           unidad:unidad_organizacional(nombre_corto, nombre)))`
     )
     .is("deleted_at", null)
+    .is("meta.deleted_at", null)
+    .is("meta.proyecto.deleted_at", null)
     .not("fecha_fin", "is", null)
     .gte("fecha_fin", desde)
     .lte("fecha_fin", hasta)

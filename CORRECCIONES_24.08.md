@@ -308,6 +308,31 @@ Ninguna se tocó todavía; van acá para que no se pierdan.
 | 3 | ~~El rol `coordinador` no puede crear proyectos.~~ **Arreglado** en `4d8ca1f`: el selector de área se armaba con un ternario por rol sin rama para coordinador, así que veía el botón con el desplegable vacío. Ahora los cuatro roles con permiso de carga salen de `unidadesQuePuedeCargar`, el espejo de la RLS. | resuelto |
 | 4 | **`propuesta_carga` no aparece con RLS habilitada** en ninguna migración, a diferencia del resto de las tablas. Conviene confirmarlo contra la base: si es así, es accesible con la clave anónima. | a confirmar |
 | 5 | `COLOR_PENDIENTE = "#4B5563"` en `semaforo-gauge.tsx` sigue siendo un gris oscuro fijo. En modo claro se ve, pero queda fuera de la paleta. No estaba en el pedido. | cosmética |
+| 6 | **Casi ningún indicador tiene fecha de fin cargada: 64 de 1896 (3,4 %).** La alerta automática de vencimiento está hecha y probada, pero sin ese dato no tiene de qué avisar. Ver abajo. | **alta — el pedido E queda a medias por datos, no por código** |
+| 7 | **Un indicador tiene `fecha_fin = 20026-04-27`** (año 20026, error de tipeo por 2026). No rompe nada, pero es dato basura. | baja — corregirlo a mano |
+| 8 | **485 de los 1896 indicadores vivos cuelgan de metas con `deleted_at`.** No es un bug en sí (el borrado es lógico), pero cualquier consulta que no filtre por la meta los cuenta. Ya se corrigió en `getIndicadoresPorVencer`; vale revisar si otras pantallas los están incluyendo. | media |
+
+### Sobre el hallazgo 6: la alerta automática no tiene de qué avisar todavía
+
+Medido el 26.08:
+
+| | |
+|---|---|
+| Indicadores con `fecha_fin` | **64 de 1896** (3,4 %) |
+| De esos, ya vencidos | 6 |
+| Vencen en los próximos 15 días | **0** |
+| Vencen después | 58 — el primero el 31.10, y **52 de golpe el 31.12** |
+| Se probó también usar `meta.fecha_limite` como respaldo | No sirve: solo 5 metas lo tienen. Cobertura combinada 4,3 % |
+
+La herramienta funciona: se validó la consulta y se vio qué mostraría con una
+ventana más amplia (53 indicadores, con proyecto y unidad correctos). El problema
+es que **hoy la campanita va a estar vacía de alertas automáticas**, y el 16.12
+se van a disparar 52 juntas.
+
+No es algo que se arregle con código: hay que cargar las fechas de fin de los
+indicadores. Conviene decidir con Planificación Estratégica si eso se pide a las
+áreas o si el plazo se toma del período del POA cuando el indicador no tiene uno
+propio.
 
 ---
 
