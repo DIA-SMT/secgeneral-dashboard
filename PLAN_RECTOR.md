@@ -412,13 +412,47 @@ Las cuatro primeras son bloqueantes del modelo o del tablero. Ver
 
 | Etapa | Qué | Depende del cliente | Esfuerzo |
 |---|---|---|---|
-| **1** | Migración 044: esquema + seed de los 104 nodos y los 14 ODS desde `plan-rector.json` | **no** | ~1 día |
-| **2** | Pantalla `/plan-rector` de solo lectura: árbol de 5 ámbitos → 17 ejes → objetivos → líneas, con ODS. Sin números todavía | **no** | ~1 día |
-| **3** | UI de imputación: asignar proyecto → nodo, con estado propuesto/confirmado y la exclusión con motivo. Repartida por dirección | **no** | ~2 días |
+| **1** | Migración 044: esquema + seed de los 104 nodos y los 14 ODS desde `plan-rector.json` | **no** | **hecha** (`6acc503`) |
+| **2** | Pantalla `/plan-rector` de solo lectura: árbol de 5 ámbitos → 17 ejes → objetivos → líneas, con ODS. Sin números todavía | **no** | **hecha** (`6acc503`) |
+| **3** | UI de imputación: asignar proyecto → nodo, con estado propuesto/confirmado y la exclusión con motivo. Repartida por dirección | **no** | **hecha** (`6acc503`) |
 | **4** | Sugerencias por lote: precargar los ~190 de acuerdo unánime como `propuesto` para que cada área solo confirme | pregunta 4 | ~1 día |
 | **5** | El cálculo y el tablero con números | **sí — preguntas 1, 2, 4** | ~2 días |
 | **6** | Ítem en el sidebar + modo TV | no | ~medio día |
 
-**Las etapas 1 a 3 se pueden hacer ya.** La 5 es la que hay que esperar: si se
+**Las etapas 1 a 3 están hechas.** La 5 es la que hay que esperar: si se
 implementa el cálculo antes de que definan si un proyecto puede colgar de varios
 ejes, se rehace.
+
+### Para aplicarlo
+
+1. Aplicar `supabase/migrations/044_plan_rector.sql`.
+2. Cargar la jerarquía: `npx tsx supabase/import/500_import_plan_rector.ts`
+   (acepta `--dry-run`).
+
+El orden respecto del deploy no importa: las lecturas del Plan Rector degradan si
+las tablas todavía no existen, así que la pantalla muestra el estado vacío en vez
+de tirar 500.
+
+### Verificación de la migración 044 (31.08)
+
+Corrida completa contra la base **dentro de una transacción revertida**, con
+autorización de Lucas. **26 casos, ninguna falla.** Al terminar,
+`to_regclass('public.plan_rector_nodo')` volvió a ser NULL: no quedó nada
+aplicado.
+
+Cubrió: que la migración corra entera y sea idempotente (corre dos veces sin
+error); las 6 tablas, 3 enums, 14 policies, 4 triggers y el índice único; los
+CHECK de tipo↔nivel y de nombre vacío; el trigger que valida el tipo del padre;
+que un proyecto no se pueda imputar directo a un ámbito; que `principal` exija
+estado confirmado; que no pueda haber dos vínculos principales por proyecto; y la
+RLS con sesión simulada — un director no puede insertar un vínculo ya confirmado
+ni marcado como principal, ni declarar un proyecto fuera del plan, ni editar la
+jerarquía, y el admin funcional sí.
+
+> Nota al margen, **preexistente y no introducida acá**: `authenticated` tiene
+> `TRUNCATE` sobre estas tablas, igual que sobre las 10 que ya existían
+> (`proyecto`, `meta`, `indicador`, `perfil_usuario`…). Es el default de Supabase
+> para el schema `public`. `TRUNCATE` no respeta RLS, pero PostgREST no lo expone,
+> así que no es alcanzable desde la app ni desde la API. Si algún día se quiere
+> cerrar, es un `REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public` global — decisión
+> aparte de este trabajo.
