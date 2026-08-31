@@ -18,6 +18,9 @@ const navItems: NavItem[] = [
   { href: "/estructura", label: "Estructura", icon: "◈" },
   { href: "/indicadores", label: "Indicadores", icon: "◉" },
   { href: "/avance-direcciones", label: "Avance por Dirección", icon: "📊" },
+  // 24.08, página 36: "incorporar una herramienta para medir los avances del
+  // Plan Rector", con la captura señalando este menú.
+  { href: "/plan-rector", label: "Plan Rector", icon: "◇" },
   { href: "/agenda", label: "Agenda", icon: "📅" },
   { href: "/poa-2027", label: "POA 2027", icon: "◆" },
   {
