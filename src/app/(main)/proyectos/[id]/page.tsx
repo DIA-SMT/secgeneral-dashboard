@@ -1,5 +1,8 @@
-import { getProyecto, getMetasPorProyecto, getHitosPorProyecto, getAvancesPorProyecto } from "@/lib/queries";
+import { getProyecto, getMetasPorProyecto, getHitosPorProyecto, getAvancesPorProyecto, getUnidades } from "@/lib/queries";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getImputacionesDeProyecto, getNodosImputables } from "@/lib/plan-rector";
+import { ImputacionCard } from "@/components/plan-rector/imputacion-card";
+import { unidadesQuePuedeCargar } from "@/lib/utils";
 import type { Indicador } from "@/types/database";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
@@ -8,7 +11,7 @@ import { NuevaMetaForm } from "@/components/dashboard/nueva-meta-form";
 import { ProyectoAcciones } from "@/components/dashboard/proyecto-acciones";
 import { HitoActions } from "@/components/dashboard/hito-actions";
 import { AvancesList } from "@/components/dashboard/avances-list";
-import { getPerfilActual, getScopeUnidades } from "@/lib/auth";
+import { getPerfilActual } from "@/lib/auth";
 import { formatFecha, calcularPorcentajeMeta, avanceMetaEnPlazo, avanceAgregado, avanceIndicadorEnPlazo } from "@/lib/utils";
 import { MiniGauge } from "@/components/ui/mini-gauge";
 import { BackButton } from "@/components/layout/back-button";
@@ -43,22 +46,22 @@ export default async function ProyectoDetallePage({
   }
 
   const perfil = await getPerfilActual();
-  let puedeCargar = false;
-  if (perfil) {
-    if (perfil.rol === "admin_funcional") {
-      puedeCargar = true;
-    } else if (perfil.rol === "director") {
-      puedeCargar = perfil.unidad_id === proyecto.unidad_id;
-    } else if (
-      perfil.rol === "secretario" ||
-      perfil.rol === "subsecretario" ||
-      perfil.rol === "coordinador"
-    ) {
-      // Secretario/Subsec/Coordinador: cualquier proyecto dentro de su ámbito
-      const scope = await getScopeUnidades(perfil);
-      puedeCargar = scope.includes(proyecto.unidad_id);
-    }
-  }
+
+  // Espejo de `usuario_puede_cargar_unidad` (SQL). Se usa el helper y no una
+  // cadena de ifs propia para que la UI no quede atrás de la RLS: hasta la
+  // migración 042 acá se comparaba `perfil.unidad_id === proyecto.unidad_id`
+  // para el director, y desde el 26.08 el director también carga sobre las
+  // unidades por ENCIMA de la suya (su subsecretaría y su secretaría). Con la
+  // comparación vieja, la base se lo permitía y la pantalla no.
+  const unidades = await getUnidades();
+  const puedeCargar =
+    !!perfil &&
+    unidadesQuePuedeCargar(perfil, unidades).some((u) => u.id === proyecto.unidad_id);
+
+  const [{ imputaciones, excluido }, nodosImputables] = await Promise.all([
+    getImputacionesDeProyecto(proyecto.id),
+    getNodosImputables(),
+  ]);
 
   const ahora = new Date().toISOString().slice(0, 10);
   // Avance del proyecto por cascada: cada meta se deriva de sus indicadores y
@@ -149,6 +152,16 @@ export default async function ProyectoDetallePage({
           {proyecto.fecha_fin && <span>Fin: {formatFecha(proyecto.fecha_fin)}</span>}
         </div>
       </div>
+
+      {/* Plan Rector: acá se produce el vínculo que el Excel del cliente no trajo. */}
+      <ImputacionCard
+        proyectoId={proyecto.id}
+        imputaciones={imputaciones}
+        excluido={excluido}
+        nodos={nodosImputables}
+        puedeProponer={puedeCargar}
+        esAdmin={perfil?.rol === "admin_funcional"}
+      />
 
       {/* Metas (con formulario de carga inline) */}
       <div>
