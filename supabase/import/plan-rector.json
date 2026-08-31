@@ -1,0 +1,743 @@
+{
+  "ambitos": [
+    {
+      "orden": 1,
+      "codigo": "A1",
+      "nombre": "Ciudad ordenada y sustentable",
+      "nombre_completo": "A1: Ciudad ordenada y sustentable",
+      "ejes": [
+        {
+          "orden": 1,
+          "numero": "1",
+          "nombre": "Reestructuración urbana",
+          "nombre_completo": "1. Reestructuración urbana",
+          "ods": [
+            "8. Trabajo decente y crecimiento económico",
+            "9. Industria, innovación e infrestructura",
+            "11. Ciudades y comunidades disponibles",
+            "16. Paz, justicia e instituciones solidas"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Consolidar una ciudad incusiva, ordenada, segura, sostenible y sustentable, desde la periferia al centro, garantizando el derecho a la ciudad.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 2,
+                  "nombre": "Ciudad humanizada: Reformulación del desarrollo de la ciudad “de abajo hacia arriba”, con, por y para las personas. La finalidad es construir una inteligencia colectiva generada por la integración del saber técnico con el saber cotidiano de la ciudadanía y obtener soluciones para recuperar el espacio público y maximizar su valor en la sociedad, todo de manera innovadora y experimental."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 4,
+                  "nombre": "División del mapa de la ciudad en Zonas de Influencia Municipal adecuando la escala de los barrios existentes al crecimiento de la ciudad y responder, de esta manera, a las necesidades de una nueva escala urbana."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 5,
+                  "nombre": "Creación de Puntos de Acceso Ciudadano (PACs), en los Centros de Integración Comunitaria (CICs), a través de los cuales se descentralizarán los trámites contenidos en distintas reparticiones dependientes de la gestión municipal. A través de este modelo, se busca la mayor eficiencia y transparencia en la gestión de trámites que actualmente funcionan en distintas reparticiones y a diferentes escalas, bajo un único Sistema Integrado de Información del Ciudadano, en un solo espacio físico, digitalizado y en una sola instancia de concurrencia."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 2,
+          "numero": "2",
+          "nombre": "Repavimentación planificada y estratégica",
+          "nombre_completo": "2. Repavimentación planificada y estratégica",
+          "ods": [
+            "3. Salud y bienestar",
+            "9. Industria, innovación e infrestructura",
+            "11. Ciudades y comunidades disponibles"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Implementar un plan de obras que contemplen pavimentación y repavimentación, erradicación de calles de tierra; obras nuevas y ampliaciones, con el fin de mejorar la calidad de vida de cada vecino y vecina.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 7,
+                  "nombre": "Confección de un diagnóstico exhaustivo del estado actual de calles del municipio, haciendo distinción entre las arterias principales y de mayor tránsito en la ciudad, y las de menor congestión, pero que contribuyen a la seguridad de cada uno de los barrios."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 8,
+                  "nombre": "Implementación del Plan Integral de Recuperación Calles y Bacheo, a través de un esquema de planificación ordenada y sostenible para el abordaje de la ciudad y con una instancia de participación ciudadana en la que, los vecinos de cada barrio, podrán informar por los canales de comunicación habilitados. Se trabajará, prioritariamente, durante el turno noche, evitando así la congestión de la ciudad."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 9,
+                  "nombre": "Desarrollo de un Plan de Prevención de Daños. Conformado por las instrucciones y recomendaciones que desde el municipio se brindarán sobre las tareas de excavación y movimiento de suelo en la vía pública, con la finalidad de evitar roturas de cañerías de gas, agua, líneas de fibra óptica, durante la ejecución de obras."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 3,
+          "numero": "3",
+          "nombre": "Refuncionalización edilicia",
+          "nombre_completo": "3. Refuncionalización edilicia",
+          "ods": [
+            "9. Industria, innovación e infrestructura",
+            "11. Ciudades y comunidades disponibles"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Garantizar a través de la restauración y/o refuncionalización, la preservación de la integrdad e identidad de la ciudad de San Miguel de Tucumán.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 10,
+                  "nombre": "Recuperación de espacios en desuso y altamente deprimidos, con alto potencial de desarrollo, para refuncionalizarlos y atender necesidades puntuales de cada uno de los barrios que conforman la capital."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 11,
+                  "nombre": "Recuperación de obras emblemáticas que forman parte de la identidad de todos los vecinos, tales como el Palacio de los Deportes, el Mercado del Norte, la Asistencia Pública, entre otros."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "orden": 2,
+      "codigo": "A2",
+      "nombre": "Ciudad con bienestar para todas las familias",
+      "nombre_completo": "A2: Ciudad con bienestar para todas las familias",
+      "ejes": [
+        {
+          "orden": 1,
+          "numero": "4",
+          "nombre": "Cultura ambiental y espacios verdes",
+          "nombre_completo": "4. Cultura ambiental y espacios verdes",
+          "ods": [
+            "3. Salud y bienestar",
+            "11. Ciudades y comunidades disponibles",
+            "12. Producción y consumo responsables",
+            "13. Acción por el clima",
+            "15. Vida y ecosistemas terrestres"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": "4.1",
+              "nombre": "Planificar y ejecutar acciones tendientes a preservar el medio ambiente y dar cumplimiento a la norma ambiental.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 12,
+                  "nombre": "Limpieza y saneamiento de basurales y promoción de la separación de residuos con la finalidad de evitar enfermedades y garantizar las condiciones de salubridad de toda la población."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 13,
+                  "nombre": "Reducción de los niveles de contaminación en el Municipio de San Miguel de Tucumán a través del Plan de Gestión Integral de Residuos Sólidos Urbanos (GIRSU)."
+                }
+              ]
+            },
+            {
+              "orden": 2,
+              "codigo": "4.2",
+              "nombre": "Contribuir a la mejora de la calidad de vida y la conservacion de la biodiversidad a través del correcto mantenimiento y recuperación de espacios verdes.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 14,
+                  "nombre": "Implementación de un Plan de Arborización y Espacios Verdes en base a una planificación que considere las especies arbóreas nativas indicadas para cada espacio, la creación de nuevos espacios verdes y el correcto mantenimiento de los actuales."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 15,
+                  "nombre": "Fortalecimiento de la vinculación entre actores locales, organizaciones de la sociedad civil, Estado y empresas para generar mayor participación ciudadana en el desarrollo sostenible."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 2,
+          "numero": "5",
+          "nombre": "Educación ambiental",
+          "nombre_completo": "5. Educación ambiental",
+          "ods": [
+            "4. Educación de calidad",
+            "9. Industria, innovación e infrestructura",
+            "11. Ciudades y comunidades disponibles",
+            "12. Producción y consumo responsables",
+            "13. Acción por el clima",
+            "15. Vida y ecosistemas terrestres"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Promover actividades pedagógicas orintadas a la protección del medio ambiente, como parte de la construcción de la ciudadanía activa y comprometida.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 17,
+                  "nombre": "Promoción de la Educación Ambiental Integral mediante la implementación de programas y políticas que fomenten la conciencia y la responsabilidad ambiental en la comunidad."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 19,
+                  "nombre": "Promoción de prácticas y políticas que afirmen el uso sostenible de los recursos naturales en la ciudad de San Miguel de Tucumán."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 21,
+                  "nombre": "Creación de programas de educación sobre el cambio climático, la promoción de prácticas sostenibles en la ciudad y la colaboración con organizaciones ambientales locales."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 3,
+          "numero": "6",
+          "nombre": "Empleo verde",
+          "nombre_completo": "6. Empleo verde",
+          "ods": [
+            "8. Trabajo decente y crecimiento económico",
+            "9. Industria, innovación e infrestructura",
+            "11. Ciudades y comunidades disponibles",
+            "12. Producción y consumo responsables",
+            "13. Acción por el clima",
+            "15. Vida y ecosistemas terrestres"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Promover prácticas laborales sustentables que favorezcan el empleo, el cuidado y la restauración de los recursos naturales, el ambiente y la biodiversidad.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 23,
+                  "nombre": "Creación de la primera Planta de Reciclaje en el Municipio de San Miguel de Tucumán."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 24,
+                  "nombre": "Coordinación con empresas e industrias, para la optimización de los procesos de producción, la reducción de los residuos, el uso eficiente de los recursos naturales y la implementación de energías renovables"
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 25,
+                  "nombre": "Implementación de estrategias que favorezcan el consumo responsable, priorizando productos y servicios sostenibles y respetuosos con el medio ambiente."
+                },
+                {
+                  "orden": 4,
+                  "fila_excel": 26,
+                  "nombre": "Implementación de Ecopuntos y del Programa SE-PA-RÁ en la ciudad con la participación de diferentes actores de la sociedad (recicladores, organizaciones de la sociedad civil, empresas, Estado, entre otros)."
+                },
+                {
+                  "orden": 5,
+                  "fila_excel": 27,
+                  "nombre": "Implementación del Programa CONTROLÁ a través del Centro de Monitoreo Ambiental (CMA) instalado en las instalaciones del COMM para controlar con GPS el recorrido de los camiones de recolección domiciliaria, los de recolección diferenciada del programa SE-PA-RÁ y los vehículos que realizan barrido mecánico."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 4,
+          "numero": "7",
+          "nombre": "Cuidado de animales de compañía",
+          "nombre_completo": "7. Cuidado de animales de compañía",
+          "ods": [
+            "15. Vida y ecosistemas terrestres"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Impulsar acciones tendientes al cuidado y respeto de los animales de compañía y otros animales, con el fin de evitar el maltrato, la explotación y el abandono.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 29,
+                  "nombre": "Puesta en funcionamiento del Programa de Control de Población de animales callejeros que incluya la esterilización y la adopción responsable de perros y gatos. Estos programas ayudan a reducir el sufrimiento de los animales y los problemas de salud pública asociados al creciente número de animales abandonados."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 30,
+                  "nombre": "Implementación de un sistema integral de gestión de la salud de los animales de compañía, a través de atención veterinaria adecuada y regular, vacunas, tratamientos preventivos e identificación y registro."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "orden": 3,
+      "codigo": "A3",
+      "nombre": "Ciudad cercana, accesible y segura",
+      "nombre_completo": "A3: Ciudad cercana, accesible y segura",
+      "ejes": [
+        {
+          "orden": 1,
+          "numero": "8",
+          "nombre": "Movilidad urbana sostenible",
+          "nombre_completo": "8. Movilidad urbana sostenible",
+          "ods": [
+            "3. Salud y bienestar",
+            "7. Energia asequible y no contaminante",
+            "9. Industria, innovación e infrestructura",
+            "11. Ciudades y comunidades disponibles",
+            "12. Producción y consumo responsables",
+            "13. Acción por el clima"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Diseñar e implementar un nuevo modelo de movilidad urbana, a través de una red de transporte público inclusivo y de calidad y la mejora en las condiciones de transitabilidad.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 31,
+                  "nombre": "Implementación y refuncionalización de ciclovías para brindar un espacio seguro y exclusivo para el desplazamineto de bicicletas en la ciudad."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 32,
+                  "nombre": "Generación de un nuevo esquema de transporte público en coordinación con las empresas que prestan dicho servicio en el que se instale un modelo de ingreso y egreso al microcentro."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 34,
+                  "nombre": "Promoción de políticas de movilidad inclusiva."
+                },
+                {
+                  "orden": 4,
+                  "fila_excel": 36,
+                  "nombre": "Promoción de la movilidad sostenible a través de alternativas al transporte motorizado, como bicicletas y monopatines eléctricos, al tiempo que se impulsa una cultura de respeto hacia los peatones"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 2,
+          "numero": "9",
+          "nombre": "Semaforización inteligente",
+          "nombre_completo": "9. Semaforización inteligente",
+          "ods": [
+            "3. Salud y bienestar",
+            "7. Energia asequible y no contaminante",
+            "8. Trabajo decente y crecimiento económico",
+            "11. Ciudades y comunidades disponibles"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Implementar un Plan de Semaforización Inteligente, que incluya el mantenimiento y sincronización estratégica de los existentes y la incorporación en zonas de alto caudal de tránsito.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 37,
+                  "nombre": "División de la ciudad en zonas de alto caudal de tránsito y control de manera remota de la onda verde."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 3,
+          "numero": "10",
+          "nombre": "Smart City",
+          "nombre_completo": "10. Smart City",
+          "ods": [
+            "5. Igualdad de género",
+            "7. Energia asequible y no contaminante",
+            "8. Trabajo decente y crecimiento económico",
+            "9. Industria, innovación e infrestructura",
+            "10. Reducción de las desigualdades",
+            "11. Ciudades y comunidades disponibles",
+            "12. Producción y consumo responsables",
+            "16. Paz, justicia e instituciones solidas",
+            "17. Alianzas para lograr los objetivos"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Desarrollar un proyecto de Smart City centrado en la implementación de innovaciones tecnológicas, destinadas a mejorar la experiencia de los ciudadanos y optimizar los servicios municipales, con énfasis en la eficiencia de la distribución de recursos y en la calidad de vida de la población, mediante aplicaciones tecnológicas y la adopción de soluciones inteligentes.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 41,
+                  "nombre": "Proyección de soluciones colectivas para recuperar el espacio público y aumentar su valor para la sociedad, reimaginando la ciudad con un enfoque centrado en las personas."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 43,
+                  "nombre": "Abordaje integral para el achicamiento de la brecha digital, a través de la promoción y la capacitación en el uso de los recursos digitales disponibles."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 46,
+                  "nombre": "Incorporación de la tecnología informática y las telecomunicaciones para la optimización de la gestión y la resolución de los problemas públicos de una manera colaborativa y con un mayor protagonismo de la ciudadanía."
+                },
+                {
+                  "orden": 4,
+                  "fila_excel": 48,
+                  "nombre": "Implementación del Plan de Transformación Digital TRADI, que promueve la adopción de herramientas digitales en diferentes instancias y procesos de la gestión municipal, con la finalidad de mejorar los niveles de eficiencia, efectividad, transparencia y calidad en la gestión de los servicios públicos que se ofrecen a los ciudadanos."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "orden": 4,
+      "codigo": "A4",
+      "nombre": "Ciudad centrada en las personas",
+      "nombre_completo": "A4: Ciudad centrada en las personas",
+      "ejes": [
+        {
+          "orden": 1,
+          "numero": "11",
+          "nombre": "Salud",
+          "nombre_completo": "11. Salud",
+          "ods": [
+            "3. Salud y bienestar",
+            "5. Igualdad de género",
+            "10. Reducción de las desigualdades"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Abordar la salud desde un punto de vista integral: bienestar físico, mental y social y enfatizar en la accesibilidad, equidad, integralidad, eficiencia, calidad y continuidad de los servicios municipales de salud, en coordinación con el Sistema Provincial de Salud.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 50,
+                  "nombre": "Refuncionalización de la Asistencia Pública municipal brindando servicios de calidad y excelencia en el ámbito primario de la Salud."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 51,
+                  "nombre": "Refuncionalización y fortalecimiento de los 15 Centros de Atención Comunitaria priorizando la promoción y prevención de enfermedades crónicas no transmisibles, hábitos de vida saludable y cuidado del medio ambiente, en sectores de mayor riesgo social."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 52,
+                  "nombre": "Refuerzo de la atención primaria de la salud a través del Trailer de Desarrollo Humano en zonas de mayor vulnerabilidad social."
+                },
+                {
+                  "orden": 4,
+                  "fila_excel": 53,
+                  "nombre": "Implementación progresiva de servicios de emergencias odontológicas las 24 hs."
+                },
+                {
+                  "orden": 5,
+                  "fila_excel": 54,
+                  "nombre": "Implementación de la Red de Salud Mental en articulación con el sistema provincial para el abordaje de casos de consumo problemático de sustancias."
+                },
+                {
+                  "orden": 6,
+                  "fila_excel": 55,
+                  "nombre": "Fortalecimiento del Centro Interdisciplinario Municipal para el tratamiento del Trastorno del Espectro Autista, CIMTEA."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 2,
+          "numero": "12",
+          "nombre": "Educación",
+          "nombre_completo": "12. Educación",
+          "ods": [
+            "1. Fin de la pobreza",
+            "4. Educación de calidad",
+            "5. Igualdad de género",
+            "8. Trabajo decente y crecimiento económico",
+            "10. Reducción de las desigualdades"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "En coordinación con el Ministerio de Educación de la provincia, favorecer el desarrollo dentro del contexto escolar contribuyendo a una educación de calidad, con servicios de equidad e inclusión.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 56,
+                  "nombre": "Optimización de la infraestructura de las escuelas municipales y aumento de los recursos disponibles para los docentes y estudiantes."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 58,
+                  "nombre": "Incorporación de idiomas extranjeros y actividades de extensión en los establecimientos educativos municipales."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 59,
+                  "nombre": "Fortalecimiento del Gabinete Psicopedagógico como pilar fundamental para una educación inclusiva y de calidad."
+                },
+                {
+                  "orden": 4,
+                  "fila_excel": 60,
+                  "nombre": "Desarrollo del Programa de Fortalecimiento de la Orientación de Informática en el marco de la Economía del Conocimiento para escuelas secundarias municipales."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 3,
+          "numero": "13",
+          "nombre": "Seguridad ciudadana",
+          "nombre_completo": "13. Seguridad ciudadana",
+          "ods": [
+            "3. Salud y bienestar",
+            "5. Igualdad de género",
+            "10. Reducción de las desigualdades",
+            "16. Paz, justicia e instituciones solidas"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Realizar acciones con la finalidad de garantizar la tranquilidad, paz y protección de la integridad física y moral de la población, mediante la vigilancia, prevención de actos delictivos y orientación ciudadana.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 61,
+                  "nombre": "Puesta en funcionamiento del Programa de Prevención de Siniestros Viales que genere datos confiables, campañas de información, incremento de controles y regulación de los horarios de carga y descarga de proveedores e incorporación de reductores de velocidad."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 62,
+                  "nombre": "Promoción de instancias intermedias de gestión de los problemas urbanos, a través de un Programa de Mediación Comunitaria para facilitar el diálogo y acuerdos entre los vecinos para descomprimir el conflicto y generar cohesión social."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 64,
+                  "nombre": "Implementación de un enfoque multisectorial para el desarrollo de un Sistema Integral, Sistematizado y Tecnológico de Seguridad Ciudadana que genere información confiable y potencie al Sistema de Monitoreo actual, fortaleciendo el conocimiento local sobre la conflictividad y la violencia, permitiendo coordinación con dispositivos, autoridades y fuerzas policiales provinciales para mayor inmediatez."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 4,
+          "numero": "14",
+          "nombre": "Turismo",
+          "nombre_completo": "14. Turismo",
+          "ods": [
+            "8. Trabajo decente y crecimiento económico",
+            "12. Producción y consumo responsables"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Impulsar el abordaje turístico basado en la sustentabilidad económica, social, cultural y ambiental, sosteniendo la autenticidad cultural y garantizando una mayor calidad en la experiencia de los visitantes.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 65,
+                  "nombre": "Promoción de Circuitos Turísticos con servicios de traslados e ingresos gratuitos y de bajo costo para turistas y ciudadanos de la provincia que promuevan un turismo inclusivo, diverso, sin límites por zona o barrio"
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 66,
+                  "nombre": "Desarrollo de la aplicación Mi Municipio como herramienta que permita conocer toda la oferta hotelera, gastronómica y de servicios de la ciudad."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 5,
+          "numero": "15",
+          "nombre": "Cultura",
+          "nombre_completo": "15. Cultura",
+          "ods": [
+            "3. Salud y bienestar",
+            "4. Educación de calidad",
+            "5. Igualdad de género",
+            "10. Reducción de las desigualdades",
+            "11. Ciudades y comunidades disponibles",
+            "12. Producción y consumo responsables"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Garantizar el acceso a los derechos culturales para todas y todos los ciudadanos de manera integral, inclusiva e igualitaria, promoviendo el libre acceso a los bienes culturales.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 67,
+                  "nombre": "Plan de Reestructuración y Revalorización de Bibliotecas Municipales."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 69,
+                  "nombre": "Promoción de museos innovadores y tecnológicamente interactivos que reflejen la multiplicidad de expresiones artísticas tucumanas."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 70,
+                  "nombre": "Desarrollo de proyectos culturales en barrios a través de la intervención de gestores que promuevan el arte, la música, el teatro y otras actividades."
+                },
+                {
+                  "orden": 4,
+                  "fila_excel": 72,
+                  "nombre": "Implementación del Pase Cultural para jóvenes entre 15 y 25 años, estudiantes de escuelas y universidades públicas, para igualar el acceso al consumo cultural a través de una red de espacios adheridos."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "orden": 5,
+      "codigo": "A5",
+      "nombre": "Ciudad abierta y de oportunidades",
+      "nombre_completo": "A5: Ciudad abierta y de oportunidades",
+      "ejes": [
+        {
+          "orden": 1,
+          "numero": "16",
+          "nombre": "Niñez, juventud, mujeres, adultos mayores",
+          "nombre_completo": "16. Niñez, juventud, mujeres, adultos mayores",
+          "ods": [
+            "1. Fin de la pobreza",
+            "3. Salud y bienestar",
+            "4. Educación de calidad",
+            "5. Igualdad de género",
+            "8. Trabajo decente y crecimiento económico",
+            "10. Reducción de las desigualdades",
+            "11. Ciudades y comunidades disponibles",
+            "16. Paz, justicia e instituciones solidas"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": null,
+              "nombre": "Garantizar el crecimiento saludable, el desarrollo pleno de niños y adolescentes y el cuidado y respeto por los adultos mayores, entendiendo a la familia como el núcleo y espacio afectivo fundamental de las personas.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 73,
+                  "nombre": "Implementar y gestionar el Presupuesto Participativo para brindar a los vecinos la oportunidad de debatir y elegir las próximas mejoras en los barrios."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 74,
+                  "nombre": "Desarrollo del Paseo del Adulto Mayor, donde puedan disfrutar y compartir experiencias las personas de la tercera edad con sus pares y un equipo interdisciplinario de profesionales."
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 75,
+                  "nombre": "Programa de articulación con los clubes barriales para promoción del deporte en niños y adolescentes."
+                },
+                {
+                  "orden": 4,
+                  "fila_excel": 76,
+                  "nombre": "Desarrollo del Programa de asistencia técnica exclusiva para el colectivo LGBTQ+ para el desarrollo de programas y proyectos."
+                },
+                {
+                  "orden": 5,
+                  "fila_excel": 77,
+                  "nombre": "Implementación del Programa Orientar Futuro destinado a jóvenes a partir de los 16 años que podrán tomar contacto con las necesidades crecientes del mercado laboral y los perfiles requeridos en el ámbito de la industria del conocimiento"
+                },
+                {
+                  "orden": 6,
+                  "fila_excel": 78,
+                  "nombre": "Creación del Circuito de las Infancias. Espacio exclusivo para niños y niñas con juegos interactivos y de última tecnología."
+                },
+                {
+                  "orden": 7,
+                  "fila_excel": 79,
+                  "nombre": "Implementar la Expo Ciudad Joven SMT que permita impulsar la vocación y empleabilidad de los jóvenes."
+                },
+                {
+                  "orden": 8,
+                  "fila_excel": 80,
+                  "nombre": "Creación del Observatorio de Violencia de Género Municipal, en coordinación con la Secretaría de la Mujer de la provincia con el objetivo de brindar asesoramiento social, psicológico y legal e implementar estrategias de abordaje para los casos de violencia por razones de género."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orden": 2,
+          "numero": "17",
+          "nombre": "Emprendedurismo y fomento del empleo",
+          "nombre_completo": "17. Emprendedurismo y fomento del empleo",
+          "ods": [
+            "1. Fin de la pobreza",
+            "4. Educación de calidad",
+            "8. Trabajo decente y crecimiento económico",
+            "9. Industria, innovación e infrestructura",
+            "10. Reducción de las desigualdades",
+            "11. Ciudades y comunidades disponibles",
+            "12. Producción y consumo responsables"
+          ],
+          "objetivos": [
+            {
+              "orden": 1,
+              "codigo": "17.1",
+              "nombre": "Facilitar acciones tendientes a la formación del capital humano, el acceso al financiamiento, el fortalecimiento y acompañamiento para los emprendedores y consolidación de la comunidad emprendedora.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 81,
+                  "nombre": "Generación de proyectos que permitan mejorar la empleabilidad de los recicladores urbanos y trabajadores abocados al reciclaje."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 83,
+                  "nombre": "Promoción del emprendedurismo a través de talleres que brinden apoyo técnico y profesional."
+                }
+              ]
+            },
+            {
+              "orden": 2,
+              "codigo": "17.2",
+              "nombre": "Reconvertir la matriz productiva del Municipio hacia un modelo de desarrollo limpio, sustentable, que piense en el cuidado del medioambiente, en la equidad de género, en el mundo del trabajo y en la integración de sectores vulnerables de la sociedad.",
+              "lineas": [
+                {
+                  "orden": 1,
+                  "fila_excel": 84,
+                  "nombre": "Promoción del desarrollo de emprendimientos y PyMES que incorporen principios de la economía circular en sus procesos productivos."
+                },
+                {
+                  "orden": 2,
+                  "fila_excel": 85,
+                  "nombre": "Implementación del Digesto Fiscal, para evaluar la carga tributaria actual del municipio y avanzar en la creación de un sistema tributario que fomente y promueva la actividad de las PyMES y el comercio"
+                },
+                {
+                  "orden": 3,
+                  "fila_excel": 86,
+                  "nombre": "Poner en funcionamiento la habilitación digital para comercios a través de la App Mi Municipio."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
